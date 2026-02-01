@@ -10,6 +10,7 @@
 import { stopPlayback } from './audio-processor.js';
 import { getKaraokeTiming } from './calibration.js';
 import { detectLanguage, getBaseTimePerChar } from './language-detect.js';
+import { measureDuration, calculateUnitTimings } from './tts-calibrator.js';
 
 // Track current playback state
 let currentKaraokeTimer = null;
@@ -128,57 +129,84 @@ export async function playTTSAtSpeed(text, speed, options = {}) {
                     currentScheduledTimeouts.push(timeout);
                 });
             } else {
-                // Fall back to timer-based estimation
-                if (isChinese) {
-                    // Chinese: character-based timing, exclude punctuation
-                    const PUNCT_REGEX = /[，。！？、；：""''「」『』【】〖〗《》〈〉（）\[\]{},.!?;:'"()\-–—…\s]/;
-                    const allChars = text.split('').filter(c => c.trim());
-                    const speakableCount = allChars.filter(c => !PUNCT_REGEX.test(c)).length;
+                // Use dynamic calibration - measureDuration was already called above
+                // or fall back to estimated timing based on text analysis
 
-                    // Chinese TTS speaks ~8-10 chars per second at 1x
-                    const baseTimePerChar = 0.10; // 100ms per character
-                    const totalTime = (baseTimePerChar * speakableCount) / effectiveSpeed * 1000;
-                    const intervalTime = totalTime / units;
+                // Check if we have pre-cached calibration timing from options
+                if (options.dynamicTiming && options.dynamicTiming.length > 0) {
+                    console.log(`Using pre-calibrated dynamic timing at ${effectiveSpeed}x`);
 
-                    console.log(`Chinese: ${speakableCount} speakable chars, ${Math.round(intervalTime)}ms/char at ${effectiveSpeed}x`);
-
-                    // Fire first immediately
-                    onBoundary?.({ charIndex: 0, charLength: 1 });
-                    let karaokeIndex = 1;
-
-                    currentKaraokeTimer = setInterval(() => {
-                        if (karaokeIndex < units && isPlaying) {
-                            onBoundary?.({ charIndex: karaokeIndex, charLength: 1 });
-                            karaokeIndex++;
-                        } else {
-                            clearInterval(currentKaraokeTimer);
-                            currentKaraokeTimer = null;
-                        }
-                    }, intervalTime);
+                    // Schedule each unit based on calibrated timing
+                    options.dynamicTiming.forEach((unitTiming, i) => {
+                        const scaledStartTime = unitTiming.startTime / effectiveSpeed;
+                        const timeout = setTimeout(() => {
+                            if (isPlaying) {
+                                onBoundary?.({ charIndex: i, charLength: 1 });
+                            }
+                        }, scaledStartTime);
+                        currentScheduledTimeouts.push(timeout);
+                    });
                 } else {
-                    // English: word-based timing
-                    const words = text.split(/\s+/).filter(w => w.trim());
+                    // Fallback: estimate using text analysis with word-length weighting
+                    if (isChinese) {
+                        // Chinese: character-based timing, exclude punctuation
+                        const PUNCT_REGEX = /[，。！？、；：""''「」『』【】〖〗《》〈〉（）\[\]{},.!?;:'"()\-–—…\s]/;
+                        const allChars = text.split('').filter(c => c.trim());
+                        const speakableCount = allChars.filter(c => !PUNCT_REGEX.test(c)).length;
 
-                    // English TTS speaks ~4-5 words per second at 1x (200-250ms/word)
-                    const baseTimePerWord = 0.18; // 180ms per word
-                    const totalTime = (baseTimePerWord * words.length) / effectiveSpeed * 1000;
-                    const intervalTime = totalTime / words.length;
+                        // Chinese TTS speaks ~8-10 chars per second at 1x
+                        const baseTimePerChar = 0.10; // 100ms per character
+                        const totalTime = (baseTimePerChar * speakableCount) / effectiveSpeed * 1000;
+                        const intervalTime = totalTime / units;
 
-                    console.log(`English: ${words.length} words, ${Math.round(intervalTime)}ms/word at ${effectiveSpeed}x`);
+                        console.log(`Chinese (estimated): ${speakableCount} speakable chars, ${Math.round(intervalTime)}ms/char at ${effectiveSpeed}x`);
 
-                    // Fire first immediately
-                    onBoundary?.({ charIndex: 0, charLength: 1 });
-                    let wordIndex = 1;
+                        // Fire first immediately
+                        onBoundary?.({ charIndex: 0, charLength: 1 });
+                        let karaokeIndex = 1;
 
-                    currentKaraokeTimer = setInterval(() => {
-                        if (wordIndex < words.length && isPlaying) {
-                            onBoundary?.({ charIndex: wordIndex, charLength: 1 });
-                            wordIndex++;
-                        } else {
-                            clearInterval(currentKaraokeTimer);
-                            currentKaraokeTimer = null;
+                        currentKaraokeTimer = setInterval(() => {
+                            if (karaokeIndex < units && isPlaying) {
+                                onBoundary?.({ charIndex: karaokeIndex, charLength: 1 });
+                                karaokeIndex++;
+                            } else {
+                                clearInterval(currentKaraokeTimer);
+                                currentKaraokeTimer = null;
+                            }
+                        }, intervalTime);
+                    } else {
+                        // English: word-length weighted timing
+                        const words = text.split(/\s+/).filter(w => w.trim());
+                        const totalChars = words.reduce((sum, w) => sum + w.replace(/[^\w]/g, '').length, 0);
+
+                        // Base: ~200ms average per word at 1x
+                        const baseTotalTime = 200 * words.length;
+                        const scaledTotalTime = baseTotalTime / effectiveSpeed;
+
+                        console.log(`English (word-weighted): ${words.length} words, ~${Math.round(scaledTotalTime / words.length)}ms avg at ${effectiveSpeed}x`);
+
+                        // Fire first immediately
+                        onBoundary?.({ charIndex: 0, charLength: 1 });
+
+                        // Schedule each word with weighted timing
+                        let cumulativeTime = 0;
+                        for (let i = 1; i < words.length; i++) {
+                            // Weight by previous word's length
+                            const prevWordChars = words[i - 1].replace(/[^\w]/g, '').length;
+                            const wordDuration = (prevWordChars / totalChars) * scaledTotalTime;
+                            cumulativeTime += wordDuration;
+
+                            const capturedIndex = i;
+                            const capturedTime = cumulativeTime;
+
+                            const timeout = setTimeout(() => {
+                                if (isPlaying) {
+                                    onBoundary?.({ charIndex: capturedIndex, charLength: 1 });
+                                }
+                            }, capturedTime);
+                            currentScheduledTimeouts.push(timeout);
                         }
-                    }, intervalTime);
+                    }
                 }
             }
         };

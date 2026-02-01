@@ -106,17 +106,9 @@ export default function Player({
                         console.log(`Playing at ${stage.speed}x${timing ? ' (calibrated)' : ''}`);
                     },
                     onBoundary: ({ charIndex }) => {
-                        // Update karaoke position
-                        if (isChinese) {
-                            setActiveWordIndex(charIndex);
-                            setSpokenWords(prev => new Set([...prev, ...Array.from({ length: charIndex }, (_, i) => i)]));
-                        } else {
-                            // For non-Chinese, find word index
-                            const before = text.substring(0, charIndex);
-                            const wordIndex = before.split(/\s+/).length - 1;
-                            setActiveWordIndex(wordIndex);
-                            setSpokenWords(prev => new Set([...prev, ...Array.from({ length: wordIndex }, (_, i) => i)]));
-                        }
+                        // charIndex is now the unit index (char for Chinese, word for English)
+                        setActiveWordIndex(charIndex);
+                        setSpokenWords(prev => new Set([...prev, ...Array.from({ length: charIndex }, (_, i) => i)]));
                     },
                     onEnd: () => {
                         // Mark ALL words as spoken when TTS ends
