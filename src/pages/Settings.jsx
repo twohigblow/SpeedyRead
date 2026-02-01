@@ -4,6 +4,7 @@
  */
 import { useState, useEffect } from 'react';
 import { getSettings, updateSettings, exportData, importData, clearAllData } from '../services/db';
+import { testApiKey, VOICE_TYPES } from '../services/google-tts';
 import VoiceSelector from '../components/VoiceSelector';
 import LoopMatrix from '../components/LoopMatrix';
 
@@ -11,6 +12,8 @@ export default function Settings() {
     const [settings, setSettings] = useState(null);
     const [loading, setLoading] = useState(true);
     const [showApiKey, setShowApiKey] = useState(false);
+    const [showGoogleApiKey, setShowGoogleApiKey] = useState(false);
+    const [googleKeyTesting, setGoogleKeyTesting] = useState(false);
     const [message, setMessage] = useState(null);
 
     useEffect(() => {
@@ -74,6 +77,22 @@ export default function Settings() {
         }
     };
 
+    const handleTestGoogleKey = async () => {
+        if (!settings.googleTtsApiKey) {
+            showMessage('請先輸入 API 金鑰');
+            return;
+        }
+        setGoogleKeyTesting(true);
+        try {
+            const valid = await testApiKey(settings.googleTtsApiKey);
+            showMessage(valid ? '✅ API 金鑰有效' : '❌ API 金鑰無效');
+        } catch {
+            showMessage('❌ 測試失敗');
+        } finally {
+            setGoogleKeyTesting(false);
+        }
+    };
+
     if (loading || !settings) {
         return (
             <div className="page">
@@ -91,49 +110,173 @@ export default function Settings() {
                     <h1 className="page-title">⚙️ 設定</h1>
                 </div>
 
-                {/* Language Selection */}
+                {/* TTS Mode Toggle */}
                 <section className="card mb-md">
-                    <h3 className="mb-md">語言</h3>
-                    <div className="flex gap-md">
+                    <h3 className="mb-md">🎙️ TTS 模式</h3>
+                    <div className="flex gap-md mb-sm">
                         <button
-                            className={`btn ${settings.language === 'zh-HK' ? 'btn-primary' : 'btn-ghost'}`}
-                            onClick={() => handleUpdate('language', 'zh-HK')}
+                            className={`btn ${settings.ttsMode === 'offline' ? 'btn-primary' : 'btn-ghost'}`}
+                            onClick={() => handleUpdate('ttsMode', 'offline')}
                             style={{ flex: 1 }}
                         >
-                            粵語
+                            📱 離線 (Web Speech)
                         </button>
                         <button
-                            className={`btn ${settings.language === 'zh-CN' ? 'btn-primary' : 'btn-ghost'}`}
-                            onClick={() => handleUpdate('language', 'zh-CN')}
+                            className={`btn ${settings.ttsMode === 'online' ? 'btn-primary' : 'btn-ghost'}`}
+                            onClick={() => handleUpdate('ttsMode', 'online')}
                             style={{ flex: 1 }}
                         >
-                            普通話
+                            ☁️ 線上 (Google Cloud)
                         </button>
                     </div>
-                </section>
-
-                {/* Chinese Voice Selection */}
-                <section className="card mb-md">
-                    <h3 className="mb-md">中文語音 (Chinese Voice)</h3>
-                    <VoiceSelector
-                        selectedVoiceUri={settings.voiceUri}
-                        language={settings.language}
-                        onChange={(uri) => handleUpdate('voiceUri', uri)}
-                    />
-                </section>
-
-                {/* English Voice Selection */}
-                <section className="card mb-md">
-                    <h3 className="mb-md">英文語音 (English Voice)</h3>
-                    <p className="text-muted mb-sm" style={{ fontSize: 'var(--font-size-sm)' }}>
-                        Auto-selected when text is primarily English
+                    <p className="text-muted" style={{ fontSize: 'var(--font-size-xs)' }}>
+                        {settings.ttsMode === 'offline'
+                            ? '使用裝置內建語音，可離線使用'
+                            : '使用 Google Cloud TTS，精準卡拉OK同步'
+                        }
                     </p>
-                    <VoiceSelector
-                        selectedVoiceUri={settings.englishVoiceUri}
-                        language="en-US"
-                        onChange={(uri) => handleUpdate('englishVoiceUri', uri)}
-                    />
                 </section>
+
+                {/* Offline Mode Settings */}
+                {settings.ttsMode === 'offline' && (
+                    <>
+                        <section className="card mb-md">
+                            <h3 className="mb-md">📱 中文語音 (Offline)</h3>
+                            <VoiceSelector
+                                selectedVoiceUri={settings.voiceUri}
+                                language={settings.language}
+                                onChange={(uri) => handleUpdate('voiceUri', uri)}
+                            />
+                        </section>
+
+                        <section className="card mb-md">
+                            <h3 className="mb-md">📱 英文語音 (Offline)</h3>
+                            <p className="text-muted mb-sm" style={{ fontSize: 'var(--font-size-sm)' }}>
+                                Auto-selected when text is primarily English
+                            </p>
+                            <VoiceSelector
+                                selectedVoiceUri={settings.englishVoiceUri}
+                                language="en-US"
+                                onChange={(uri) => handleUpdate('englishVoiceUri', uri)}
+                            />
+                        </section>
+                    </>
+                )}
+
+                {/* Online Mode Settings */}
+                {settings.ttsMode === 'online' && (
+                    <section className="card mb-md">
+                        <h3 className="mb-md">☁️ Google Cloud TTS</h3>
+
+                        {/* API Key */}
+                        <div className="mb-md">
+                            <label className="text-muted mb-sm" style={{ fontSize: 'var(--font-size-sm)', display: 'block' }}>
+                                API 金鑰
+                                <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer"
+                                    style={{ color: 'var(--color-primary)', marginLeft: '8px' }}>設定指南 →</a>
+                            </label>
+                            <div className="flex gap-sm">
+                                <input
+                                    type={showGoogleApiKey ? 'text' : 'password'}
+                                    className="input"
+                                    placeholder="輸入 Google Cloud API 金鑰..."
+                                    value={settings.googleTtsApiKey || ''}
+                                    onChange={(e) => handleUpdate('googleTtsApiKey', e.target.value)}
+                                    style={{ flex: 1 }}
+                                />
+                                <button
+                                    className="btn btn-ghost"
+                                    onClick={() => setShowGoogleApiKey(!showGoogleApiKey)}
+                                >
+                                    {showGoogleApiKey ? '🙈' : '👁️'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Voice Quality */}
+                        <div className="mb-md">
+                            <label className="text-muted mb-sm" style={{ fontSize: 'var(--font-size-sm)', display: 'block' }}>
+                                語音品質 (quota exceeded will auto-fallback)
+                            </label>
+                            <div className="flex gap-sm">
+                                {VOICE_TYPES.map(type => (
+                                    <button
+                                        key={type}
+                                        className={`btn ${settings.googleVoiceType === type ? 'btn-primary' : 'btn-ghost'}`}
+                                        onClick={() => handleUpdate('googleVoiceType', type)}
+                                        style={{ flex: 1 }}
+                                    >
+                                        {type}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Chinese Voice */}
+                        <div className="mb-md">
+                            <label className="text-muted mb-sm" style={{ fontSize: 'var(--font-size-sm)', display: 'block' }}>
+                                中文語音
+                            </label>
+                            <select
+                                className="input"
+                                value={settings.googleChineseVoice || 'yue-HK-Standard-A'}
+                                onChange={(e) => handleUpdate('googleChineseVoice', e.target.value)}
+                            >
+                                <optgroup label="粵語 Cantonese">
+                                    <option value="yue-HK-Standard-A">yue-HK-Standard-A (Female)</option>
+                                    <option value="yue-HK-Standard-B">yue-HK-Standard-B (Male)</option>
+                                    <option value="yue-HK-Standard-C">yue-HK-Standard-C (Female)</option>
+                                    <option value="yue-HK-Standard-D">yue-HK-Standard-D (Male)</option>
+                                </optgroup>
+                                <optgroup label="普通話 Mandarin">
+                                    <option value="cmn-CN-Standard-A">cmn-CN-Standard-A (Female)</option>
+                                    <option value="cmn-CN-Standard-B">cmn-CN-Standard-B (Male)</option>
+                                    <option value="cmn-CN-Wavenet-A">cmn-CN-Wavenet-A (Female)</option>
+                                    <option value="cmn-CN-Wavenet-B">cmn-CN-Wavenet-B (Male)</option>
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        {/* English Voice */}
+                        <div className="mb-md">
+                            <label className="text-muted mb-sm" style={{ fontSize: 'var(--font-size-sm)', display: 'block' }}>
+                                英文語音
+                            </label>
+                            <select
+                                className="input"
+                                value={settings.googleEnglishVoice || 'en-US-Neural2-F'}
+                                onChange={(e) => handleUpdate('googleEnglishVoice', e.target.value)}
+                            >
+                                <optgroup label="Neural2 (Best)">
+                                    <option value="en-US-Neural2-A">en-US-Neural2-A (Male)</option>
+                                    <option value="en-US-Neural2-C">en-US-Neural2-C (Female)</option>
+                                    <option value="en-US-Neural2-D">en-US-Neural2-D (Male)</option>
+                                    <option value="en-US-Neural2-F">en-US-Neural2-F (Female)</option>
+                                </optgroup>
+                                <optgroup label="WaveNet">
+                                    <option value="en-US-Wavenet-A">en-US-Wavenet-A (Male)</option>
+                                    <option value="en-US-Wavenet-C">en-US-Wavenet-C (Female)</option>
+                                    <option value="en-US-Wavenet-D">en-US-Wavenet-D (Male)</option>
+                                    <option value="en-US-Wavenet-F">en-US-Wavenet-F (Female)</option>
+                                </optgroup>
+                                <optgroup label="Standard">
+                                    <option value="en-US-Standard-A">en-US-Standard-A (Male)</option>
+                                    <option value="en-US-Standard-C">en-US-Standard-C (Female)</option>
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        {/* Test Button */}
+                        <button
+                            className="btn btn-ghost"
+                            onClick={handleTestGoogleKey}
+                            disabled={googleKeyTesting || !settings.googleTtsApiKey}
+                            style={{ width: '100%' }}
+                        >
+                            {googleKeyTesting ? '測試中...' : '🔍 測試 API 金鑰'}
+                        </button>
+                    </section>
+                )}
 
                 {/* Default Loop Config */}
                 <section className="card mb-md">

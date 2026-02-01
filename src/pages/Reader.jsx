@@ -194,8 +194,13 @@ export default function Reader() {
                     text={text.content}
                     recording={activeRecording?.audioBlob}
                     loopConfig={loopConfig}
+                    ttsMode={settings?.ttsMode}
                     voiceUri={settings?.voiceUri}
                     englishVoiceUri={settings?.englishVoiceUri}
+                    googleTtsApiKey={settings?.googleTtsApiKey}
+                    googleVoiceType={settings?.googleVoiceType}
+                    googleChineseVoice={settings?.googleChineseVoice}
+                    googleEnglishVoice={settings?.googleEnglishVoice}
                     timing={text?.timing}
                 />
 

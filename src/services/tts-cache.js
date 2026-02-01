@@ -11,10 +11,12 @@ import { stopPlayback } from './audio-processor.js';
 import { getKaraokeTiming } from './calibration.js';
 import { detectLanguage, getBaseTimePerChar } from './language-detect.js';
 import { measureDuration, calculateUnitTimings } from './tts-calibrator.js';
+import { playGoogleTTS } from './google-tts.js';
 
 // Track current playback state
 let currentKaraokeTimer = null;
 let currentScheduledTimeouts = [];
+let currentGoogleTTSController = null;
 let isPlaying = false;
 
 // Browser TTS max speed
@@ -62,7 +64,11 @@ function clearKaraokeSchedule() {
  * @param {object} options - Options including timing data
  */
 export async function playTTSAtSpeed(text, speed, options = {}) {
-    const { voiceUri, englishVoiceUri, timing, onBoundary, onEnd, onStart } = options;
+    const {
+        voiceUri, englishVoiceUri,
+        googleTtsApiKey, googleVoiceType, googleChineseVoice, googleEnglishVoice,
+        timing, onBoundary, onEnd, onStart
+    } = options;
     const synth = window.speechSynthesis;
 
     // Detect language
@@ -89,6 +95,40 @@ export async function playTTSAtSpeed(text, speed, options = {}) {
     // Clear previous schedule
     clearKaraokeSchedule();
 
+    // If Google TTS API key is available, use Google Cloud TTS for accurate timing
+    if (googleTtsApiKey) {
+        const selectedGoogleVoice = isChinese ? googleChineseVoice : googleEnglishVoice;
+        console.log(`Using Google Cloud TTS: ${googleVoiceType || 'Neural2'}, voice: ${selectedGoogleVoice || 'default'}`);
+        try {
+            const controller = await playGoogleTTS(text, googleTtsApiKey, effectiveSpeed, {
+                voiceType: googleVoiceType || 'Neural2',
+                chineseVoice: googleChineseVoice,
+                englishVoice: googleEnglishVoice,
+                onStart,
+                onBoundary,
+                onEnd
+            });
+
+            // Store reference for stop functionality
+            currentGoogleTTSController = controller;
+            isPlaying = true;
+
+            return new Promise((resolve) => {
+                // The playGoogleTTS handles everything, we just wait for it
+                const checkInterval = setInterval(() => {
+                    if (!isPlaying) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 100);
+            });
+        } catch (error) {
+            console.warn('Google TTS failed, falling back to Web Speech API:', error.message);
+            // Fall through to Web Speech API
+        }
+    }
+
+    // Fall back to Web Speech API
     return new Promise((resolve, reject) => {
         const utterance = new SpeechSynthesisUtterance(text);
 
@@ -154,8 +194,8 @@ export async function playTTSAtSpeed(text, speed, options = {}) {
                         const allChars = text.split('').filter(c => c.trim());
                         const speakableCount = allChars.filter(c => !PUNCT_REGEX.test(c)).length;
 
-                        // Chinese TTS speaks ~8-10 chars per second at 1x
-                        const baseTimePerChar = 0.10; // 100ms per character
+                        // Chinese TTS speaks ~3-4 chars per second at 1x
+                        const baseTimePerChar = 0.30; // 300ms per character
                         const totalTime = (baseTimePerChar * speakableCount) / effectiveSpeed * 1000;
                         const intervalTime = totalTime / units;
 
@@ -179,8 +219,8 @@ export async function playTTSAtSpeed(text, speed, options = {}) {
                         const words = text.split(/\s+/).filter(w => w.trim());
                         const totalChars = words.reduce((sum, w) => sum + w.replace(/[^\w]/g, '').length, 0);
 
-                        // Base: ~200ms average per word at 1x
-                        const baseTotalTime = 200 * words.length;
+                        // Base: ~400ms average per word at 1x (TTS is slower than reading)
+                        const baseTotalTime = 400 * words.length;
                         const scaledTotalTime = baseTotalTime / effectiveSpeed;
 
                         console.log(`English (word-weighted): ${words.length} words, ~${Math.round(scaledTotalTime / words.length)}ms avg at ${effectiveSpeed}x`);
@@ -254,6 +294,13 @@ export function stopTTS() {
     window.speechSynthesis?.cancel();
     stopPlayback();
     clearKaraokeSchedule();
+
+    // Stop Google Cloud TTS if active
+    if (currentGoogleTTSController) {
+        currentGoogleTTSController.stop?.();
+        currentGoogleTTSController = null;
+    }
+
     isPlaying = false;
 }
 

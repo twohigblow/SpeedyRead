@@ -11,9 +11,14 @@ export default function Player({
     text = '',
     recording = null, // Audio blob for recordings
     loopConfig = [{ speed: 1.0 }],
-    voiceUri = null,           // Chinese voice
-    englishVoiceUri = null,    // English voice (auto-selected)
-    timing = null, // Calibrated timing data for precise karaoke
+    ttsMode = 'offline',       // 'offline' (Web Speech) or 'online' (Google Cloud)
+    voiceUri = null,           // Chinese voice (Web Speech)
+    englishVoiceUri = null,    // English voice (Web Speech)
+    googleTtsApiKey = null,    // Google Cloud TTS API key
+    googleVoiceType = 'Neural2', // Neural2, WaveNet, Standard
+    googleChineseVoice = null, // Selected Google Chinese voice
+    googleEnglishVoice = null, // Selected Google English voice
+    timing = null, // Calibrated timing data
     onComplete = null
 }) {
     const [isPlaying, setIsPlaying] = useState(false);
@@ -93,34 +98,47 @@ export default function Player({
                 console.error('Recording playback failed:', err);
             }
         } else {
-            // Use TTS with high-speed cache support
-            // For speeds > 3x, playTTSAtSpeed will:
-            // 1. Generate TTS at 1x and cache it
-            // 2. Play the cached audio at the target speed using Web Audio API
+            // Use TTS - check mode to determine which TTS to use
+            const useGoogleTTS = ttsMode === 'online' && googleTtsApiKey;
+
+            // Only enable karaoke for online mode (Google TTS has accurate timing)
+            // Offline Web Speech API timing is too inaccurate for karaoke
+            const enableKaraoke = useGoogleTTS;
+
             try {
                 await playTTSAtSpeed(text, stage.speed, {
                     voiceUri,
                     englishVoiceUri,
-                    timing, // Pass calibrated timing for precise karaoke
+                    ttsMode,
+                    googleTtsApiKey: useGoogleTTS ? googleTtsApiKey : null,
+                    googleVoiceType,
+                    googleChineseVoice,
+                    googleEnglishVoice,
+                    timing,
                     onStart: () => {
-                        console.log(`Playing at ${stage.speed}x${timing ? ' (calibrated)' : ''}`);
+                        console.log(`Playing at ${stage.speed}x${useGoogleTTS ? ' (Google TTS + Karaoke)' : ' (Web Speech, no karaoke)'}`);
+                        // For offline mode, immediately mark all as "active" (no highlighting animation)
+                        if (!enableKaraoke) {
+                            setActiveWordIndex(-1);
+                            setSpokenWords(new Set());
+                        }
                     },
-                    onBoundary: ({ charIndex }) => {
-                        // charIndex is now the unit index (char for Chinese, word for English)
+                    onBoundary: enableKaraoke ? ({ charIndex }) => {
                         setActiveWordIndex(charIndex);
                         setSpokenWords(prev => new Set([...prev, ...Array.from({ length: charIndex }, (_, i) => i)]));
-                    },
+                    } : null,
                     onEnd: () => {
-                        // Mark ALL words as spoken when TTS ends
-                        setSpokenWords(new Set(Array.from({ length: totalUnits }, (_, i) => i)));
-                        setActiveWordIndex(totalUnits - 1);
+                        if (enableKaraoke) {
+                            setSpokenWords(new Set(Array.from({ length: totalUnits }, (_, i) => i)));
+                            setActiveWordIndex(totalUnits - 1);
+                        }
                     }
                 });
             } catch (err) {
                 console.error('TTS failed:', err);
             }
         }
-    }, [text, recording, loopConfig, voiceUri, englishVoiceUri, timing]);
+    }, [text, recording, loopConfig, ttsMode, voiceUri, englishVoiceUri, googleTtsApiKey, googleVoiceType, googleChineseVoice, googleEnglishVoice, timing]);
 
     // Play all stages in sequence
     const playAllStages = useCallback(async () => {

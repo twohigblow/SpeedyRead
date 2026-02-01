@@ -2,7 +2,7 @@
  * OCRCapture Component
  * Capture images and extract text via OCR
  */
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { performOCR } from '../services/ocr';
 
 export default function OCRCapture({
@@ -18,6 +18,15 @@ export default function OCRCapture({
 
     const fileInputRef = useRef(null);
     const cameraInputRef = useRef(null);
+
+    // Cleanup preview URL on unmount to prevent memory leaks
+    useEffect(() => {
+        return () => {
+            if (previewUrl) {
+                URL.revokeObjectURL(previewUrl);
+            }
+        };
+    }, [previewUrl]);
 
     const handleFileSelect = async (event) => {
         const file = event.target.files?.[0];
@@ -51,8 +60,14 @@ export default function OCRCapture({
     };
 
     const handleConfirm = () => {
-        onTextExtracted?.(extractedText);
-        cleanup();
+        // Pass text to parent first - the callback should handle navigation/rendering
+        // Don't cleanup here as parent will handle unmounting this component
+        if (extractedText.trim()) {
+            onTextExtracted?.(extractedText);
+            // Note: We don't call cleanup() here because:
+            // 1. Parent's handleOCRComplete sets mode='text' which unmounts this component
+            // 2. Calling cleanup would clear extractedText before parent can use it
+        }
     };
 
     const handleRetry = () => {

@@ -29,12 +29,17 @@ export const db = new SpeedyReadDB();
 // Default settings
 const DEFAULT_SETTINGS = {
     id: 'user-settings',
-    voiceUri: null,           // Chinese voice
-    englishVoiceUri: null,    // English voice (separate)
-    language: 'zh-HK', // Cantonese default
+    ttsMode: 'offline',       // 'offline' (Web Speech) or 'online' (Google Cloud)
+    voiceUri: null,           // Chinese voice (Web Speech)
+    englishVoiceUri: null,    // English voice (Web Speech)
+    language: 'zh-HK',        // Cantonese default
     geminiApiKey: '',
+    googleTtsApiKey: '',      // Google Cloud TTS API key
+    googleVoiceType: 'Neural2', // Neural2, WaveNet, Standard
+    googleChineseVoice: 'yue-HK-Standard-A',  // Google Chinese voice
+    googleEnglishVoice: 'en-US-Neural2-F',    // Google English voice
     defaultSpeed: 1.0,
-    loopConfig: [{ speed: 1.0 }], // Default: 1 repetition at 1x
+    loopConfig: [{ speed: 1.0 }],
     theme: 'dark'
 };
 
