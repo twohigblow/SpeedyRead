@@ -135,8 +135,8 @@ export async function playTTSAtSpeed(text, speed, options = {}) {
                     const allChars = text.split('').filter(c => c.trim());
                     const speakableCount = allChars.filter(c => !PUNCT_REGEX.test(c)).length;
 
-                    // Chinese: ~5-6 chars per second at 1x
-                    const baseTimePerChar = 0.18; // seconds
+                    // Chinese TTS speaks ~8-10 chars per second at 1x
+                    const baseTimePerChar = 0.10; // 100ms per character
                     const totalTime = (baseTimePerChar * speakableCount) / effectiveSpeed * 1000;
                     const intervalTime = totalTime / units;
 
@@ -159,8 +159,8 @@ export async function playTTSAtSpeed(text, speed, options = {}) {
                     // English: word-based timing
                     const words = text.split(/\s+/).filter(w => w.trim());
 
-                    // English: ~2.5 words per second at 1x speed (150 WPM)
-                    const baseTimePerWord = 0.4; // seconds per word
+                    // English TTS speaks ~4-5 words per second at 1x (200-250ms/word)
+                    const baseTimePerWord = 0.18; // 180ms per word
                     const totalTime = (baseTimePerWord * words.length) / effectiveSpeed * 1000;
                     const intervalTime = totalTime / words.length;
 
