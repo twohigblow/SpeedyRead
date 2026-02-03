@@ -7,7 +7,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getText, getSettings, updateSettings } from '../services/db';
 import { splitIntoCards, getFontSizeValue, FONT_FAMILIES, FONT_SIZES } from '../utils/flashcard-utils';
 import { speak as speakOffline, stop as stopOffline } from '../services/tts';
-import { synthesizeSpeech } from '../services/google-tts';
+import { synthesizeWithTimestamps } from '../services/google-tts';
 
 export default function FlashCard() {
     const { id } = useParams();
@@ -91,19 +91,19 @@ export default function FlashCard() {
             if (useGoogleTTS) {
                 // Use Google TTS
                 const isChinese = /[\u4e00-\u9fff]/.test(cardText);
-                const audioBlob = await synthesizeSpeech(
+                const result = await synthesizeWithTimestamps(
                     cardText,
                     settings.googleTtsApiKey,
                     {
-                        voiceName: isChinese ? settings.googleChineseVoice : settings.googleEnglishVoice,
-                        languageCode: isChinese ? 'yue-HK' : 'en-US',
                         voiceType: settings.googleVoiceType,
-                        speed: ttsSpeed
+                        speed: ttsSpeed,
+                        chineseVoice: isChinese ? settings.googleChineseVoice : null,
+                        englishVoice: !isChinese ? settings.googleEnglishVoice : null
                     }
                 );
 
-                const audio = new Audio(URL.createObjectURL(audioBlob));
-                audio.playbackRate = 1.0; // Speed already set in synthesis
+                // Play the audio from base64
+                const audio = new Audio(`data:audio/mp3;base64,${result.audioContent}`);
                 await audio.play();
             } else {
                 // Use Web Speech API
