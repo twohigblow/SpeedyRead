@@ -15,6 +15,7 @@ export default function OCRCapture({
     const [error, setError] = useState(null);
     const [extractedText, setExtractedText] = useState('');
     const [previewUrl, setPreviewUrl] = useState(null);
+    const [ocrMethod, setOcrMethod] = useState(null); // 'gemini' | 'local'
 
     const fileInputRef = useRef(null);
     const cameraInputRef = useRef(null);
@@ -32,49 +33,86 @@ export default function OCRCapture({
         const file = event.target.files?.[0];
         if (!file) return;
 
-        await processImage(file);
+        // Fix image orientation from camera
+        const correctedFile = await fixImageOrientation(file);
+        await processImage(correctedFile);
+    };
+
+    // Fix image orientation based on EXIF data
+    const fixImageOrientation = async (file) => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    // Set canvas size to match image
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+
+                    // Draw the image (this automatically corrects orientation in modern browsers)
+                    ctx.drawImage(img, 0, 0);
+
+                    // Convert back to blob
+                    canvas.toBlob((blob) => {
+                        const correctedFile = new File([blob], file.name, {
+                            type: file.type,
+                            lastModified: Date.now()
+                        });
+                        resolve(correctedFile);
+                    }, file.type);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
     };
 
     const processImage = async (file) => {
         setIsProcessing(true);
         setError(null);
         setProgress(0);
+        setOcrMethod(null);
 
         // Show preview
         setPreviewUrl(URL.createObjectURL(file));
 
         try {
-            const text = await performOCR(file, {
+            const result = await performOCR(file, {
                 apiKey,
                 preferOnline: !!apiKey,
                 onProgress: setProgress
             });
 
-            setExtractedText(text);
+            setExtractedText(result.text);
+            setOcrMethod(result.method);
             setProgress(100);
         } catch (err) {
             setError(err.message);
+            setOcrMethod(null);
         } finally {
             setIsProcessing(false);
         }
     };
 
     const handleConfirm = () => {
-        // Pass text to parent first - the callback should handle navigation/rendering
-        // Don't cleanup here as parent will handle unmounting this component
+        // Pass text to parent - this will switch mode and unmount this component
         if (extractedText.trim()) {
             onTextExtracted?.(extractedText);
-            // Note: We don't call cleanup() here because:
-            // 1. Parent's handleOCRComplete sets mode='text' which unmounts this component
-            // 2. Calling cleanup would clear extractedText before parent can use it
         }
     };
 
     const handleRetry = () => {
+        if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+        }
         setExtractedText('');
         setError(null);
         setPreviewUrl(null);
         setProgress(0);
+        setOcrMethod(null);
     };
 
     const cleanup = () => {
@@ -178,6 +216,15 @@ export default function OCRCapture({
                         // Success - Edit extracted text
                         <div className="ocr-editor">
                             <label className="label">識別結果（可編輯）</label>
+                            {ocrMethod && (
+                                <p className="text-muted mb-sm" style={{ fontSize: 'var(--font-size-xs)' }}>
+                                    ✅ 使用 {
+                                        ocrMethod === 'gemini' ? 'Gemini AI' :
+                                            ocrMethod === 'local-fallback' ? '離線 OCR（Gemini 失敗後備用）' :
+                                                '離線 OCR'
+                                    } 識別成功
+                                </p>
+                            )}
                             <textarea
                                 className="textarea"
                                 value={extractedText}

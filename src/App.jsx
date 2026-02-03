@@ -10,6 +10,7 @@ import Add from './pages/Add';
 import Edit from './pages/Edit';
 import Settings from './pages/Settings';
 import Reader from './pages/Reader';
+import FlashCard from './pages/FlashCard';
 import { useEffect } from 'react';
 import { initTTS } from './services/tts';
 import { initAudioContext } from './services/audio-processor';
@@ -44,6 +45,7 @@ function App() {
         <Route path="/edit/:id" element={<Edit />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/reader/:id" element={<Reader />} />
+        <Route path="/flashcard/:id" element={<FlashCard />} />
       </Routes>
       <BottomNav />
     </BrowserRouter>

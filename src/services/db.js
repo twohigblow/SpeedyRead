@@ -19,7 +19,10 @@ class SpeedyReadDB extends Dexie {
             recordings: '++id, textId, createdAt',
 
             // User settings (single record)
-            settings: 'id'
+            settings: 'id',
+
+            // Flashcard preset configurations
+            flashcardPresets: '++id, name, createdAt'
         });
     }
 }
@@ -40,7 +43,14 @@ const DEFAULT_SETTINGS = {
     googleEnglishVoice: 'en-US-Neural2-F',    // Google English voice
     defaultSpeed: 1.0,
     loopConfig: [{ speed: 1.0 }],
-    theme: 'dark'
+    theme: 'dark',
+    // Flashcard default settings
+    flashSpeed: 2.0,          // seconds between cards
+    flashTtsSpeed: 1.0,       // TTS playback speed for flashcards
+    flashFontSize: 'large',   // 'small', 'medium', 'large', 'xlarge'
+    flashFontFamily: 'system-ui', // font selection
+    flashTtsEnabled: true,    // enable/disable TTS in flashcard mode
+    flashAutoPlay: true       // auto-advance cards
 };
 
 // ============ Settings Operations ============
@@ -228,6 +238,34 @@ export async function importData(data) {
         textsImported: data.texts?.length || 0,
         categoriesImported: data.categories?.length || 0
     };
+}
+
+// ============ Flashcard Preset Operations ============
+
+export async function getFlashcardPresets() {
+    return db.flashcardPresets.orderBy('createdAt').reverse().toArray();
+}
+
+export async function getFlashcardPreset(id) {
+    return db.flashcardPresets.get(id);
+}
+
+export async function createFlashcardPreset(preset) {
+    const newPreset = {
+        ...preset,
+        createdAt: Date.now()
+    };
+    const id = await db.flashcardPresets.add(newPreset);
+    return { ...newPreset, id };
+}
+
+export async function updateFlashcardPreset(id, updates) {
+    await db.flashcardPresets.update(id, updates);
+    return db.flashcardPresets.get(id);
+}
+
+export async function deleteFlashcardPreset(id) {
+    return db.flashcardPresets.delete(id);
 }
 
 // ============ Utility ============

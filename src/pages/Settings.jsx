@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import { getSettings, updateSettings, exportData, importData, clearAllData } from '../services/db';
 import { testApiKey, VOICE_TYPES } from '../services/google-tts';
+import { testGeminiApiKey } from '../services/ocr';
 import VoiceSelector from '../components/VoiceSelector';
 import LoopMatrix from '../components/LoopMatrix';
 
@@ -14,6 +15,7 @@ export default function Settings() {
     const [showApiKey, setShowApiKey] = useState(false);
     const [showGoogleApiKey, setShowGoogleApiKey] = useState(false);
     const [googleKeyTesting, setGoogleKeyTesting] = useState(false);
+    const [geminiKeyTesting, setGeminiKeyTesting] = useState(false);
     const [message, setMessage] = useState(null);
 
     useEffect(() => {
@@ -90,6 +92,26 @@ export default function Settings() {
             showMessage('❌ 測試失敗');
         } finally {
             setGoogleKeyTesting(false);
+        }
+    };
+
+    const handleTestGeminiKey = async () => {
+        if (!settings.geminiApiKey) {
+            showMessage('請先輸入 Gemini API 金鑰');
+            return;
+        }
+        setGeminiKeyTesting(true);
+        try {
+            const result = await testGeminiApiKey(settings.geminiApiKey);
+            if (result.valid) {
+                showMessage('✅ Gemini API 金鑰有效');
+            } else {
+                showMessage(`❌ 金鑰無效: ${result.error || '未知錯誤'}`);
+            }
+        } catch (err) {
+            showMessage(`❌ 測試失敗: ${err.message}`);
+        } finally {
+            setGeminiKeyTesting(false);
         }
     };
 
@@ -292,12 +314,14 @@ export default function Settings() {
                     <h3 className="mb-md">Gemini API 金鑰</h3>
                     <p className="text-muted mb-md" style={{ fontSize: 'var(--font-size-sm)' }}>
                         用於線上 OCR 識別（可選）
+                        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer"
+                            style={{ color: 'var(--color-primary)', marginLeft: '8px' }}>取得 API 金鑰 →</a>
                     </p>
-                    <div className="flex gap-sm">
+                    <div className="flex gap-sm mb-md">
                         <input
                             type={showApiKey ? 'text' : 'password'}
                             className="input"
-                            placeholder="輸入 API 金鑰..."
+                            placeholder="輸入 Gemini API 金鑰..."
                             value={settings.geminiApiKey || ''}
                             onChange={(e) => handleUpdate('geminiApiKey', e.target.value)}
                             style={{ flex: 1 }}
@@ -309,6 +333,14 @@ export default function Settings() {
                             {showApiKey ? '🙈' : '👁️'}
                         </button>
                     </div>
+                    <button
+                        className="btn btn-ghost"
+                        onClick={handleTestGeminiKey}
+                        disabled={geminiKeyTesting || !settings.geminiApiKey}
+                        style={{ width: '100%' }}
+                    >
+                        {geminiKeyTesting ? '測試中...' : '🔍 測試 Gemini API 金鑰'}
+                    </button>
                 </section>
 
                 {/* Data Management */}

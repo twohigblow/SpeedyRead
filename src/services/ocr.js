@@ -149,21 +149,77 @@ async function imageToBase64(image) {
  * Tries online first (if API key available), then falls back to offline
  * @param {File|Blob} image - Image to process
  * @param {object} options - OCR options including apiKey
- * @returns {Promise<string>} - Extracted text
+ * @returns {Promise<{text: string, method: string}>} - Extracted text and method used
  */
 export async function performOCR(image, options = {}) {
     const { apiKey, preferOnline = true, ...restOptions } = options;
 
     if (preferOnline && apiKey) {
         try {
-            return await ocrOnline(image, apiKey, restOptions);
+            const text = await ocrOnline(image, apiKey, restOptions);
+            return { text, method: 'gemini' };
         } catch (error) {
             console.warn('Online OCR failed, falling back to offline:', error.message);
             // Fall through to offline
+            const text = await ocrOffline(image, restOptions);
+            return { text, method: 'local-fallback' };
         }
     }
 
-    return ocrOffline(image, restOptions);
+    const text = await ocrOffline(image, restOptions);
+    return { text, method: 'local' };
+}
+
+/**
+ * Test Gemini API key validity
+ * @param {string} apiKey - Gemini API key to test
+ * @returns {Promise<{valid: boolean, error?: string}>}
+ */
+export async function testGeminiApiKey(apiKey) {
+    if (!apiKey) {
+        return { valid: false, error: 'API key is required' };
+    }
+
+    try {
+        // Make a simple test request with minimal text
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{ text: 'Hello' }]
+                    }],
+                    generationConfig: {
+                        maxOutputTokens: 10
+                    }
+                })
+            }
+        );
+
+        if (!response.ok) {
+            const error = await response.json();
+            return {
+                valid: false,
+                error: error.error?.message || `HTTP ${response.status}: ${response.statusText}`
+            };
+        }
+
+        const data = await response.json();
+        if (data.candidates?.[0]?.content) {
+            return { valid: true };
+        }
+
+        return { valid: false, error: 'Unexpected response format' };
+    } catch (error) {
+        return {
+            valid: false,
+            error: error.message || 'Network error'
+        };
+    }
 }
 
 /**

@@ -158,37 +158,6 @@ export default function Reader() {
                     </button>
                 </div>
 
-                {/* Calibration Status & Button */}
-                {!activeRecording && (
-                    <div className="flex items-center gap-sm mb-md">
-                        {isCalibrating ? (
-                            <div className="flex items-center gap-sm" style={{ flex: 1 }}>
-                                <div className="loading-spinner" style={{ width: '16px', height: '16px' }}></div>
-                                <span className="text-muted">校準中... {Math.round(calibrationProgress * 100)}%</span>
-                            </div>
-                        ) : (
-                            <>
-                                <span
-                                    className="tag"
-                                    style={{
-                                        background: hasCalibration ? 'var(--color-success)' : 'var(--color-warning)',
-                                        fontSize: 'var(--font-size-xs)'
-                                    }}
-                                >
-                                    {hasCalibration ? '✓ 已校準' : '未校準'}
-                                </span>
-                                <button
-                                    className="btn btn-ghost"
-                                    onClick={handleCalibrate}
-                                    style={{ fontSize: 'var(--font-size-sm)', padding: 'var(--space-xs) var(--space-sm)' }}
-                                >
-                                    🎯 {hasCalibration ? '重新校準' : '校準計時'}
-                                </button>
-                            </>
-                        )}
-                    </div>
-                )}
-
                 {/* Player */}
                 <Player
                     text={text.content}
@@ -214,14 +183,32 @@ export default function Reader() {
                     </div>
                 )}
 
-                {/* Recording Toggle */}
+                {/* Mode Toggle: 朗讀 vs 閃卡 */}
                 <div className="flex gap-md mt-lg">
+                    <Link
+                        to={`/reader/${text.id}`}
+                        className="btn btn-primary"
+                        style={{ flex: 1 }}
+                    >
+                        🔊 朗讀
+                    </Link>
+                    <Link
+                        to={`/flashcard/${text.id}`}
+                        className="btn btn-ghost"
+                        style={{ flex: 1 }}
+                    >
+                        🗂️ 閃卡
+                    </Link>
+                </div>
+
+                {/* Recording Toggle */}
+                <div className="flex gap-md mt-md">
                     <button
-                        className={`btn ${activeRecording ? 'btn-ghost' : 'btn-primary'}`}
+                        className={`btn ${activeRecording ? 'btn-ghost' : 'btn-secondary'}`}
                         onClick={() => setActiveRecording(null)}
                         style={{ flex: 1 }}
                     >
-                        🔊 TTS 朗讀
+                        TTS 語音
                     </button>
                     <button
                         className={`btn ${showRecording ? 'btn-secondary' : 'btn-ghost'}`}
