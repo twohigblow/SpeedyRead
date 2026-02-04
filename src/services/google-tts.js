@@ -285,9 +285,47 @@ function parseGoogleTime(timeValue) {
 }
 
 /**
- * Convert base64 audio to Blob (better for iOS than data URIs)
+ * Create WAV header for raw LINEAR16 PCM data
+ * Google Cloud TTS returns raw PCM without WAV headers
  */
-function base64ToBlob(base64, mimeType = 'audio/mp3') {
+function createWavHeader(pcmData, sampleRate = 24000, numChannels = 1, bitsPerSample = 16) {
+    const dataLength = pcmData.length;
+    const header = new ArrayBuffer(44);
+    const view = new DataView(header);
+
+    // RIFF chunk descriptor
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + dataLength, true);
+    writeString(view, 8, 'WAVE');
+
+    // fmt sub-chunk
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+    view.setUint16(20, 1, true); // AudioFormat (1 for PCM)
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * numChannels * bitsPerSample / 8, true); // ByteRate
+    view.setUint16(32, numChannels * bitsPerSample / 8, true); // BlockAlign
+    view.setUint16(34, bitsPerSample, true);
+
+    // data sub-chunk
+    writeString(view, 36, 'data');
+    view.setUint32(40, dataLength, true);
+
+    return new Uint8Array(header);
+}
+
+function writeString(view, offset, string) {
+    for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+    }
+}
+
+/**
+ * Convert base64 LINEAR16 audio to WAV Blob
+ */
+function base64ToWavBlob(base64, sampleRate = 24000) {
+    // Decode base64 to raw PCM data
     const byteCharacters = atob(base64);
     const byteNumbers = new Array(byteCharacters.length);
 
@@ -295,8 +333,17 @@ function base64ToBlob(base64, mimeType = 'audio/mp3') {
         byteNumbers[i] = byteCharacters.charCodeAt(i);
     }
 
-    const byteArray = new Uint8Array(byteNumbers);
-    return new Blob([byteArray], { type: mimeType });
+    const pcmData = new Uint8Array(byteNumbers);
+
+    // Create WAV header
+    const wavHeader = createWavHeader(pcmData, sampleRate);
+
+    // Combine header and PCM data
+    const wavFile = new Uint8Array(wavHeader.length + pcmData.length);
+    wavFile.set(wavHeader, 0);
+    wavFile.set(pcmData, wavHeader.length);
+
+    return new Blob([wavFile], { type: 'audio/wav' });
 }
 
 /**
@@ -344,9 +391,8 @@ export async function playGoogleTTS(text, apiKey, speed = 1.0, options = {}) {
 
         console.log(`Google TTS: Playing audio`);
 
-        // Convert base64 to Blob URL for better iOS compatibility
-        // LINEAR16 is PCM audio, create WAV blob
-        const audioBlob = base64ToBlob(audioContent, 'audio/wav');
+        // Convert LINEAR16 PCM to WAV with proper headers
+        const audioBlob = base64ToWavBlob(audioContent, 24000);
         const audioUrl = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioUrl);
 
