@@ -157,10 +157,10 @@ export default function Library() {
                     <div className="text-list">
                         {filteredTexts.map(text => (
                             <div key={text.id} className="card mb-sm">
-                                <div className="flex items-center gap-md">
+                                <div className="flex items-center gap-md" style={{ flexWrap: 'wrap' }}>
                                     <Link
                                         to={`/reader/${text.id}`}
-                                        style={{ flex: 1, textDecoration: 'none', color: 'inherit' }}
+                                        style={{ flex: '1 1 200px', textDecoration: 'none', color: 'inherit', minWidth: 0 }}
                                     >
                                         <h4 style={{ marginBottom: 'var(--space-xs)' }}>
                                             {text.title || '未命名'}
@@ -170,25 +170,24 @@ export default function Library() {
                                             fontSize: 'var(--font-size-sm)',
                                             overflow: 'hidden',
                                             textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap',
-                                            maxWidth: '250px'
+                                            whiteSpace: 'nowrap'
                                         }}>
                                             {text.content.substring(0, 30)}...
                                         </p>
                                     </Link>
 
-                                    <div className="flex gap-sm">
+                                    <div className="flex gap-sm" style={{ flexShrink: 0 }}>
                                         <Link
                                             to={`/edit/${text.id}`}
                                             className="btn btn-ghost btn-icon"
-                                            style={{ fontSize: '16px', padding: '8px' }}
+                                            style={{ fontSize: '16px', padding: '8px', minWidth: '36px' }}
                                         >
                                             ✏️
                                         </Link>
                                         <button
                                             className="btn btn-ghost btn-icon"
                                             onClick={() => handleDelete(text.id)}
-                                            style={{ fontSize: '16px', padding: '8px' }}
+                                            style={{ fontSize: '16px', padding: '8px', minWidth: '36px' }}
                                         >
                                             🗑️
                                         </button>
