@@ -28,6 +28,7 @@ export default function FlashCard() {
     const [fontFamily, setFontFamily] = useState('system-ui');
     const [ttsEnabled, setTtsEnabled] = useState(true);
     const [autoPlay, setAutoPlay] = useState(true);
+    const [error, setError] = useState(null);
 
     const timerRef = useRef(null);
     const abortRef = useRef(false);
@@ -166,7 +167,10 @@ export default function FlashCard() {
             }
         } catch (err) {
             console.error('TTS failed:', err);
-            // Optionally show an error message to user
+            const errorMsg = `Flashcard TTS Error (${settings?.ttsMode || 'unknown'}): ${err.message || err}`;
+            setError(errorMsg);
+            // Show error for 10 seconds
+            setTimeout(() => setError(null), 10000);
         }
     };
 
@@ -288,6 +292,20 @@ export default function FlashCard() {
                         ⚙️
                     </button>
                 </div>
+
+                {/* Error Display */}
+                {error && (
+                    <div style={{
+                        background: '#ff4444',
+                        color: 'white',
+                        padding: 'var(--space-md)',
+                        borderRadius: 'var(--radius-md)',
+                        marginBottom: 'var(--space-md)',
+                        fontSize: 'var(--font-size-sm)'
+                    }}>
+                        <strong>⚠️ Error:</strong> {error}
+                    </div>
+                )}
 
                 {/* Settings Panel */}
                 {showSettings && (

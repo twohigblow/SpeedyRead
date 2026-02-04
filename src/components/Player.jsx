@@ -25,6 +25,7 @@ export default function Player({
     const [isPaused, setIsPaused] = useState(false);
     const [currentSpeed, setCurrentSpeed] = useState(1.0);
     const [currentStage, setCurrentStage] = useState(0);
+    const [error, setError] = useState(null);
 
     const stageRef = useRef(0);
     const abortRef = useRef(false);
@@ -74,6 +75,10 @@ export default function Player({
                 });
             } catch (err) {
                 console.error('TTS failed:', err);
+                const errorMsg = `TTS Error (${ttsMode}): ${err.message || err}`;
+                setError(errorMsg);
+                // Show error for 10 seconds
+                setTimeout(() => setError(null), 10000);
             }
         }
     }, [text, recording, loopConfig, ttsMode, voiceUri, englishVoiceUri, googleTtsApiKey, googleVoiceType, googleChineseVoice, googleEnglishVoice, timing]);
@@ -127,6 +132,20 @@ export default function Player({
 
     return (
         <div className="player">
+            {/* Error Display */}
+            {error && (
+                <div style={{
+                    background: '#ff4444',
+                    color: 'white',
+                    padding: 'var(--space-md)',
+                    borderRadius: 'var(--radius-md)',
+                    marginBottom: 'var(--space-md)',
+                    fontSize: 'var(--font-size-sm)'
+                }}>
+                    <strong>⚠️ TTS Error:</strong> {error}
+                </div>
+            )}
+
             {/* Text Display */}
             <div className="karaoke-display card">
                 {text || <span className="text-muted">沒有文字內容</span>}
