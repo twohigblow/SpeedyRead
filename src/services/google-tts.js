@@ -175,10 +175,8 @@ export async function synthesizeWithTimestamps(text, apiKey, options = {}) {
             ssmlGender: langConfig.ssmlGender
         },
         audioConfig: {
-            // Use LINEAR16 (PCM) for better iOS compatibility
-            // MP3 can have issues with certain sample rates on iOS
-            audioEncoding: 'LINEAR16',
-            sampleRateHertz: 24000,  // Explicitly set sample rate (iOS-friendly)
+            // Use MP3 for better iOS compatibility (native support)
+            audioEncoding: 'MP3',
             speakingRate: options.speed || 1.0,
             pitch: 0
         },
@@ -389,10 +387,15 @@ export async function playGoogleTTS(text, apiKey, speed = 1.0, options = {}) {
         });
         const { audioContent, timestamps, unitCount, voiceTypeUsed } = result;
 
-        console.log(`Google TTS: Playing audio`);
+        console.log(`Google TTS: Playing audio (MP3 format)`);
 
-        // Convert LINEAR16 PCM to WAV with proper headers
-        const audioBlob = base64ToWavBlob(audioContent, 24000);
+        // Convert base64 MP3 to Blob URL (simpler, better iOS support)
+        const byteCharacters = atob(audioContent);
+        const byteArray = new Uint8Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteArray[i] = byteCharacters.charCodeAt(i);
+        }
+        const audioBlob = new Blob([byteArray], { type: 'audio/mpeg' });
         const audioUrl = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioUrl);
 
