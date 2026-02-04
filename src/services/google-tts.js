@@ -351,9 +351,31 @@ export async function playGoogleTTS(text, apiKey, speed = 1.0, options = {}) {
         let animationFrameId = null;
 
         // Wait for audio to load before playing (critical for iOS)
+        // Add timeout to prevent hanging
         await new Promise((resolve, reject) => {
-            audio.onloadeddata = resolve;
-            audio.onerror = reject;
+            const timeout = setTimeout(() => {
+                console.warn('Audio loading timeout, attempting to play anyway');
+                resolve();
+            }, 3000);
+
+            audio.onloadeddata = () => {
+                clearTimeout(timeout);
+                console.log('Audio loaded successfully');
+                resolve();
+            };
+
+            audio.onerror = (e) => {
+                clearTimeout(timeout);
+                console.error('Audio loading error:', e);
+                reject(new Error('Failed to load audio'));
+            };
+
+            // For iOS, also listen to canplay event as fallback
+            audio.oncanplay = () => {
+                clearTimeout(timeout);
+                console.log('Audio can play');
+                resolve();
+            };
         });
 
         onStart?.();

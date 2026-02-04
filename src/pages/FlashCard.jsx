@@ -116,18 +116,43 @@ export default function FlashCard() {
 
                 // Wait for audio to load (critical for iOS)
                 await new Promise((resolve, reject) => {
-                    audio.onloadeddata = resolve;
-                    audio.onerror = reject;
-                    // Add timeout fallback
-                    setTimeout(() => resolve(), 5000);
+                    const timeout = setTimeout(() => {
+                        console.warn('Flashcard audio loading timeout, attempting to play anyway');
+                        resolve();
+                    }, 3000);
+
+                    audio.onloadeddata = () => {
+                        clearTimeout(timeout);
+                        console.log('Flashcard audio loaded successfully');
+                        resolve();
+                    };
+
+                    audio.onerror = (e) => {
+                        clearTimeout(timeout);
+                        console.error('Flashcard audio loading error:', e);
+                        reject(new Error('Failed to load audio'));
+                    };
+
+                    // iOS fallback - canplay event
+                    audio.oncanplay = () => {
+                        clearTimeout(timeout);
+                        console.log('Flashcard audio can play');
+                        resolve();
+                    };
                 });
 
                 // Play with cleanup
                 try {
+                    console.log('Attempting to play flashcard audio...');
                     await audio.play();
+                    console.log('Flashcard audio playing successfully');
                     // Clean up after playback
-                    audio.onended = () => URL.revokeObjectURL(audioUrl);
+                    audio.onended = () => {
+                        console.log('Flashcard audio ended, cleaning up');
+                        URL.revokeObjectURL(audioUrl);
+                    };
                 } catch (playError) {
+                    console.error('Flashcard audio play failed:', playError);
                     URL.revokeObjectURL(audioUrl);
                     throw playError;
                 }
