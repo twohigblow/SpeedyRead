@@ -135,20 +135,20 @@ export default function Settings() {
                 {/* TTS Mode Toggle */}
                 <section className="card mb-md">
                     <h3 className="mb-md">🎙️ TTS 模式</h3>
-                    <div className="flex gap-md mb-sm">
+                    <div className="flex flex-wrap gap-md mb-sm">
                         <button
                             className={`btn ${settings.ttsMode === 'offline' ? 'btn-primary' : 'btn-ghost'}`}
                             onClick={() => handleUpdate('ttsMode', 'offline')}
-                            style={{ flex: 1 }}
+                            style={{ flex: '1 1 auto', minWidth: '140px' }}
                         >
-                            📱 離線 (Web Speech)
+                            📱 離線
                         </button>
                         <button
                             className={`btn ${settings.ttsMode === 'online' ? 'btn-primary' : 'btn-ghost'}`}
                             onClick={() => handleUpdate('ttsMode', 'online')}
-                            style={{ flex: 1 }}
+                            style={{ flex: '1 1 auto', minWidth: '140px' }}
                         >
-                            ☁️ 線上 (Google Cloud)
+                            ☁️ 線上
                         </button>
                     </div>
                     <p className="text-muted" style={{ fontSize: 'var(--font-size-xs)' }}>
@@ -218,20 +218,23 @@ export default function Settings() {
                         {/* Voice Quality */}
                         <div className="mb-md">
                             <label className="text-muted mb-sm" style={{ fontSize: 'var(--font-size-sm)', display: 'block' }}>
-                                語音品質 (quota exceeded will auto-fallback)
+                                語音品質
                             </label>
-                            <div className="flex gap-sm">
+                            <div className="flex flex-wrap gap-sm">
                                 {VOICE_TYPES.map(type => (
                                     <button
                                         key={type}
                                         className={`btn ${settings.googleVoiceType === type ? 'btn-primary' : 'btn-ghost'}`}
                                         onClick={() => handleUpdate('googleVoiceType', type)}
-                                        style={{ flex: 1 }}
+                                        style={{ flex: '1 1 auto', minWidth: '90px' }}
                                     >
                                         {type}
                                     </button>
                                 ))}
                             </div>
+                            <p className="text-muted mt-sm" style={{ fontSize: 'var(--font-size-xs)' }}>
+                                配額用盡時自動降級
+                            </p>
                         </div>
 
                         {/* Chinese Voice */}
