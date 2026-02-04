@@ -102,9 +102,35 @@ export default function FlashCard() {
                     }
                 );
 
-                // Play the audio from base64
-                const audio = new Audio(`data:audio/mp3;base64,${result.audioContent}`);
-                await audio.play();
+                // Convert base64 to Blob URL for better iOS compatibility
+                const byteCharacters = atob(result.audioContent);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const audioBlob = new Blob([byteArray], { type: 'audio/mp3' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+
+                const audio = new Audio(audioUrl);
+
+                // Wait for audio to load (critical for iOS)
+                await new Promise((resolve, reject) => {
+                    audio.onloadeddata = resolve;
+                    audio.onerror = reject;
+                    // Add timeout fallback
+                    setTimeout(() => resolve(), 5000);
+                });
+
+                // Play with cleanup
+                try {
+                    await audio.play();
+                    // Clean up after playback
+                    audio.onended = () => URL.revokeObjectURL(audioUrl);
+                } catch (playError) {
+                    URL.revokeObjectURL(audioUrl);
+                    throw playError;
+                }
             } else {
                 // Use Web Speech API
                 await speakOffline(cardText, {
@@ -114,6 +140,7 @@ export default function FlashCard() {
             }
         } catch (err) {
             console.error('TTS failed:', err);
+            // Optionally show an error message to user
         }
     };
 

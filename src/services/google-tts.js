@@ -282,6 +282,21 @@ function parseGoogleTime(timeValue) {
 }
 
 /**
+ * Convert base64 audio to Blob (better for iOS than data URIs)
+ */
+function base64ToBlob(base64, mimeType = 'audio/mp3') {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+
+    for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: mimeType });
+}
+
+/**
  * Play audio from base64 content
  * Returns a promise that resolves when playback completes
  */
@@ -326,12 +341,20 @@ export async function playGoogleTTS(text, apiKey, speed = 1.0, options = {}) {
 
         console.log(`Google TTS: Playing audio`);
 
-        // Create audio element
-        const audio = new Audio(`data:audio/mp3;base64,${audioContent}`);
+        // Convert base64 to Blob URL for better iOS compatibility
+        const audioBlob = base64ToBlob(audioContent, 'audio/mp3');
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
 
         let currentIndex = 0;
         let isPlaying = true;
         let animationFrameId = null;
+
+        // Wait for audio to load before playing (critical for iOS)
+        await new Promise((resolve, reject) => {
+            audio.onloadeddata = resolve;
+            audio.onerror = reject;
+        });
 
         onStart?.();
 
@@ -377,6 +400,8 @@ export async function playGoogleTTS(text, apiKey, speed = 1.0, options = {}) {
             for (let i = currentIndex; i < unitCount; i++) {
                 onBoundary?.({ charIndex: i, charLength: 1 });
             }
+            // Clean up blob URL to prevent memory leaks
+            URL.revokeObjectURL(audioUrl);
             onEnd?.();
         };
 
@@ -385,11 +410,20 @@ export async function playGoogleTTS(text, apiKey, speed = 1.0, options = {}) {
             if (animationFrameId) {
                 cancelAnimationFrame(animationFrameId);
             }
+            // Clean up blob URL
+            URL.revokeObjectURL(audioUrl);
             console.error('Audio playback error:', e);
             onEnd?.();
         };
 
-        await audio.play();
+        // Play with error handling for iOS
+        try {
+            await audio.play();
+        } catch (playError) {
+            console.error('Failed to start audio playback:', playError);
+            URL.revokeObjectURL(audioUrl);
+            throw new Error(`Audio playback failed: ${playError.message}`);
+        }
 
         // Return control object
         return {
@@ -400,6 +434,7 @@ export async function playGoogleTTS(text, apiKey, speed = 1.0, options = {}) {
                 }
                 audio.pause();
                 audio.currentTime = 0;
+                URL.revokeObjectURL(audioUrl);
             },
             audio
         };
