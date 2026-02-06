@@ -4,7 +4,8 @@
  */
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { getTexts, getCategories, deleteText, createCategory } from '../services/db';
+import { getTexts, getCategories, deleteText, createCategory, getCategory, getWordsFromLibrary } from '../services/db';
+import ContentExporter from '../components/ContentExporter';
 
 export default function Library() {
     const [searchParams] = useSearchParams();
@@ -13,10 +14,13 @@ export default function Library() {
     const [texts, setTexts] = useState([]);
     const [categories, setCategories] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState(categoryIdParam ? parseInt(categoryIdParam) : null);
+    const [currentCategoryData, setCurrentCategoryData] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [showNewCategory, setShowNewCategory] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
+    const [showExport, setShowExport] = useState(false);
+    const [exportLibrary, setExportLibrary] = useState(null);
 
     useEffect(() => {
         loadData();
@@ -31,6 +35,13 @@ export default function Library() {
             ]);
             setTexts(textsData);
             setCategories(catsData);
+
+            if (selectedCategory) {
+                const catData = await getCategory(selectedCategory);
+                setCurrentCategoryData(catData);
+            } else {
+                setCurrentCategoryData(null);
+            }
         } catch (err) {
             console.error('Failed to load library:', err);
         } finally {
@@ -52,6 +63,31 @@ export default function Library() {
         setNewCategoryName('');
         setShowNewCategory(false);
         loadData();
+    };
+
+    const handleExportClick = async () => {
+        if (!selectedCategory || !currentCategoryData) return;
+
+        try {
+            // Fetch words for the library to create full export object
+            const words = await getWordsFromLibrary(selectedCategory);
+
+            // Structure expected by ContentExporter/manager
+            const libraryToExport = {
+                ...currentCategoryData,
+                chapters: [{
+                    name: 'Default',
+                    words: words
+                }],
+                totalWords: words.length
+            };
+
+            setExportLibrary(libraryToExport);
+            setShowExport(true);
+        } catch (err) {
+            console.error('Failed to prepare export:', err);
+            alert('準備匯出失敗');
+        }
     };
 
     // Filter texts by search query
@@ -139,6 +175,61 @@ export default function Library() {
                     </div>
                 </div>
 
+                {/* Category Metadata & Actions */}
+                {selectedCategory && currentCategoryData && (
+                    <div className="card mb-lg" style={{ background: 'var(--bg-secondary, #f9f9f9)' }}>
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <h3 className="mb-xs">{currentCategoryData.name}</h3>
+                                {currentCategoryData.description && (
+                                    <p className="text-muted mb-sm">{currentCategoryData.description}</p>
+                                )}
+
+                                <div className="flex gap-sm flex-wrap mb-sm">
+                                    {currentCategoryData.level && (
+                                        <span className="tag" style={{ background: '#e0e0e0', color: '#333' }}>
+                                            📊 {currentCategoryData.level}
+                                        </span>
+                                    )}
+                                    {currentCategoryData.language && (
+                                        <span className="tag" style={{ background: '#e0e0e0', color: '#333' }}>
+                                            🌐 {currentCategoryData.language}
+                                        </span>
+                                    )}
+                                    {currentCategoryData.tags?.map(tag => (
+                                        <span key={tag} className="tag text-muted">#{tag}</span>
+                                    ))}
+                                </div>
+                                <div className="text-muted" style={{ fontSize: '12px' }}>
+                                    {filteredTexts.length} 個字詞
+                                </div>
+                            </div>
+
+                            <button
+                                className="btn btn-primary btn-sm"
+                                onClick={handleExportClick}
+                            >
+                                📤 匯出 / 分享
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Export Modal */}
+                {showExport && exportLibrary && (
+                    <div className="modal-overlay">
+                        <div className="modal-content">
+                            <ContentExporter
+                                library={exportLibrary}
+                                onClose={() => {
+                                    setShowExport(false);
+                                    setExportLibrary(null);
+                                }}
+                            />
+                        </div>
+                    </div>
+                )}
+
                 {/* Text List */}
                 {loading ? (
                     <div className="text-center">
@@ -213,6 +304,32 @@ export default function Library() {
                     </div>
                 )}
             </div>
+
+            <style jsx>{`
+                .modal-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.5);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 1000;
+                    padding: 20px;
+                }
+                
+                .modal-content {
+                    background: white;
+                    border-radius: 12px;
+                    width: 100%;
+                    max-width: 500px;
+                    max-height: 90vh;
+                    overflow-y: auto;
+                }
+            `}</style>
         </div>
     );
 }
+

@@ -1,16 +1,18 @@
 /**
- * Add Page
- * Add new text via manual entry, paste, or OCR
+ * Add Page - Enhanced
+ * Add content via manual entry, bulk import (CSV/Excel), or OCR
  */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createText, getCategories, getSettings } from '../services/db';
+import { createText, getCategories, createCategory, getSettings } from '../services/db';
 import OCRCapture from '../components/OCRCapture';
+import ContentImporter from '../components/ContentImporter';
+import MetadataEditor from '../components/MetadataEditor';
 
 export default function Add() {
     const navigate = useNavigate();
 
-    const [mode, setMode] = useState('text'); // 'text' | 'ocr'
+    const [mode, setMode] = useState('text'); // 'text' | 'bulk' | 'ocr'
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [categoryId, setCategoryId] = useState(null);
@@ -18,6 +20,17 @@ export default function Add() {
     const [categories, setCategories] = useState([]);
     const [apiKey, setApiKey] = useState('');
     const [saving, setSaving] = useState(false);
+
+    // Bulk import states
+    const [bulkMetadata, setBulkMetadata] = useState({
+        name: '',
+        description: '',
+        category: '',
+        tags: [],
+        language: 'zh-HK',
+        level: 'beginner',
+        author: ''
+    });
 
     useEffect(() => {
         loadData();
@@ -58,6 +71,53 @@ export default function Add() {
         }
     };
 
+    const handleBulkImport = async (importData) => {
+        try {
+            setSaving(true);
+
+            // Create category with metadata
+            const categoryData = {
+                name: bulkMetadata.name || importData.metadata?.name || '匯入的內容',
+                description: bulkMetadata.description || importData.metadata?.description || '',
+                tags: bulkMetadata.tags.length > 0 ? bulkMetadata.tags : (importData.metadata?.tags || []),
+                language: bulkMetadata.language || importData.metadata?.language || 'zh-HK',
+                level: bulkMetadata.level || importData.metadata?.level || 'beginner',
+                author: bulkMetadata.author || importData.metadata?.author || '',
+                isPublic: false,
+                downloads: 0,
+                rating: 0
+            };
+
+            const newCategory = await createCategory(categoryData);
+
+            // Create texts for each chapter
+            let totalCreated = 0;
+
+            for (const chapter of importData.chapters) {
+                for (const word of chapter.words) {
+                    await createText({
+                        title: `${chapter.name} - ${word.front}`,
+                        content: word.front,
+                        back: word.back || '',
+                        pronunciation: word.pronunciation || '',
+                        type: word.type || 'word',
+                        categoryId: newCategory.id,
+                        tags: [...(word.tags || []), chapter.name]
+                    });
+                    totalCreated++;
+                }
+            }
+
+            alert(`✓ 成功匯入 ${totalCreated} 個字詞!`);
+            navigate(`/library?category=${newCategory.id}`);
+        } catch (err) {
+            console.error('Bulk import failed:', err);
+            alert('匯入失敗: ' + err.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const handleOCRComplete = (text) => {
         setContent(text);
         setMode('text');
@@ -67,34 +127,45 @@ export default function Add() {
         <div className="page">
             <div className="container">
                 <div className="page-header">
-                    <h1 className="page-title">➕ 新增文字</h1>
+                    <h1 className="page-title">➕ 新增內容</h1>
                 </div>
 
                 {/* Mode Toggle */}
-                <div className="flex gap-sm mb-lg">
+                <div className="mode-selector mb-lg">
                     <button
-                        className={`btn ${mode === 'text' ? 'btn-primary' : 'btn-ghost'}`}
+                        className={`mode-btn ${mode === 'text' ? 'active' : ''}`}
                         onClick={() => setMode('text')}
-                        style={{ flex: 1 }}
                     >
-                        ✍️ 手動輸入
+                        <span className="mode-icon">✍️</span>
+                        <span className="mode-label">手動輸入</span>
                     </button>
                     <button
-                        className={`btn ${mode === 'ocr' ? 'btn-primary' : 'btn-ghost'}`}
-                        onClick={() => setMode('ocr')}
-                        style={{ flex: 1 }}
+                        className={`mode-btn ${mode === 'bulk' ? 'active' : ''}`}
+                        onClick={() => setMode('bulk')}
                     >
-                        📷 OCR 掃描
+                        <span className="mode-icon">📥</span>
+                        <span className="mode-label">批量匯入</span>
+                    </button>
+                    <button
+                        className={`mode-btn ${mode === 'ocr' ? 'active' : ''}`}
+                        onClick={() => setMode('ocr')}
+                    >
+                        <span className="mode-icon">📷</span>
+                        <span className="mode-label">OCR 掃描</span>
                     </button>
                 </div>
 
-                {mode === 'ocr' ? (
+                {/* OCR Mode */}
+                {mode === 'ocr' && (
                     <OCRCapture
                         apiKey={apiKey}
                         onTextExtracted={handleOCRComplete}
                         onCancel={() => setMode('text')}
                     />
-                ) : (
+                )}
+
+                {/* Manual Entry Mode */}
+                {mode === 'text' && (
                     <div className="add-form">
                         {/* Title */}
                         <div className="mb-md">
@@ -158,7 +229,131 @@ export default function Add() {
                         </button>
                     </div>
                 )}
+
+                {/* Bulk Import Mode */}
+                {mode === 'bulk' && (
+                    <div className="bulk-import-section">
+                        <div className="card mb-md">
+                            <h3 className="mb-md">📋 內容資訊</h3>
+                            <MetadataEditor
+                                metadata={bulkMetadata}
+                                onChange={setBulkMetadata}
+                                showAdvanced={true}
+                            />
+                        </div>
+
+                        <ContentImporter
+                            onImport={handleBulkImport}
+                            onCancel={() => setMode('text')}
+                        />
+
+                        {/* Format Examples */}
+                        <div className="card mt-md">
+                            <h4 className="mb-sm">📝 檔案格式範例</h4>
+                            <div className="format-examples">
+                                <div className="format-example">
+                                    <h5>CSV 格式:</h5>
+                                    <pre className="code-block">
+                                        Chapter,Front,Back,Pronunciation,Type,Tags
+                                        第一課,Shirt,襯衫,sam3 saam1,word,衣服
+                                        第一課,Pants,褲子,fu3 zi2,word,衣服
+                                        第二課,Hello,你好,nei5 hou2,phrase,問候
+                                    </pre>
+                                </div>
+
+                                <div className="format-example">
+                                    <h5>文字格式:</h5>
+                                    <pre className="code-block">
+                                        ===CHAPTER: 第一課===
+                                        Shirt | 襯衫 | sam3 saam1 | word | 衣服
+                                        Pants | 褲子 | fu3 zi2 | word | 衣服
+
+                                        ===CHAPTER: 第二課===
+                                        Hello | 你好 | nei5 hou2 | phrase | 問候
+                                    </pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
+
+            <style jsx>{`
+                .mode-selector {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                    gap: 12px;
+                }
+
+                .mode-btn {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 16px 12px;
+                    border: 2px solid var(--border-color, #ddd);
+                    border-radius: 8px;
+                    background: white;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .mode-btn:hover {
+                    border-color: var(--primary-color, #4CAF50);
+                    background: rgba(76, 175, 80, 0.05);
+                }
+
+                .mode-btn.active {
+                    border-color: var(--primary-color, #4CAF50);
+                    background: var(--primary-color, #4CAF50);
+                    color: white;
+                }
+
+                .mode-icon {
+                    font-size: 32px;
+                }
+
+                .mode-label {
+                    font-size: 14px;
+                    font-weight: 600;
+                }
+
+                .format-examples {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 16px;
+                }
+
+                .format-example h5 {
+                    margin: 0 0 8px 0;
+                }
+
+                .code-block {
+                    background: #f5f5f5;
+                    padding: 12px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    overflow-x: auto;
+                    margin: 0;
+                }
+
+                @media (max-width: 768px) {
+                    .mode-selector {
+                        grid-template-columns: 1fr;
+                    }
+
+                    .mode-btn {
+                        flex-direction: row;
+                        justify-content: center;
+                        padding: 12px;
+                    }
+
+                    .mode-icon {
+                        font-size: 24px;
+                    }
+                }
+            `}</style>
         </div>
     );
 }
+

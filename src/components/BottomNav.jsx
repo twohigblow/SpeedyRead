@@ -8,6 +8,7 @@ export default function BottomNav() {
     const navItems = [
         { to: '/', icon: '🏠', label: '首頁' },
         { to: '/library', icon: '📚', label: '書庫' },
+        { to: '/playlist', icon: '🎵', label: '播放列表' },
         { to: '/add', icon: '➕', label: '新增' },
         { to: '/settings', icon: '⚙️', label: '設定' },
     ];

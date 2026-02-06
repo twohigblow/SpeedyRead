@@ -11,6 +11,8 @@ import Edit from './pages/Edit';
 import Settings from './pages/Settings';
 import Reader from './pages/Reader';
 import FlashCard from './pages/FlashCard';
+import Playlist from './pages/Playlist';
+import PlaylistPlayer from './pages/PlaylistPlayer';
 import { useEffect } from 'react';
 import { initTTS } from './services/tts';
 import { initAudioContext } from './services/audio-processor';
@@ -46,6 +48,8 @@ function App() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/reader/:id" element={<Reader />} />
         <Route path="/flashcard/:id" element={<FlashCard />} />
+        <Route path="/playlist" element={<Playlist />} />
+        <Route path="/playlist-player" element={<PlaylistPlayer />} />
       </Routes>
       <BottomNav />
     </BrowserRouter>

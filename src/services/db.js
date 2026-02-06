@@ -8,21 +8,34 @@ class SpeedyReadDB extends Dexie {
     constructor() {
         super('SpeedyReadDB');
 
+        // Version 1: Original schema
         this.version(1).stores({
-            // Text entries with category and tags
             texts: '++id, categoryId, *tags, createdAt, updatedAt',
-
-            // Categories (folders) for organization  
             categories: '++id, parentId, name, order',
-
-            // Voice recordings linked to texts
             recordings: '++id, textId, createdAt',
-
-            // User settings (single record)
             settings: 'id',
-
-            // Flashcard preset configurations
             flashcardPresets: '++id, name, createdAt'
+        });
+
+        // Version 2: Add metadata fields for marketplace
+        this.version(2).stores({
+            texts: '++id, categoryId, *tags, createdAt, updatedAt',
+            categories: '++id, parentId, name, order, *tags, language, level',
+            recordings: '++id, textId, createdAt',
+            settings: 'id',
+            flashcardPresets: '++id, name, createdAt'
+        }).upgrade(tx => {
+            // Add new fields to existing categories
+            return tx.table('categories').toCollection().modify(category => {
+                category.description = category.description || '';
+                category.tags = category.tags || [];
+                category.author = category.author || '';
+                category.language = category.language || 'zh-HK';
+                category.level = category.level || 'beginner';
+                category.isPublic = false;
+                category.downloads = 0;
+                category.rating = 0;
+            });
         });
     }
 }
@@ -277,4 +290,37 @@ export async function clearAllData() {
         await db.recordings.clear();
         await db.settings.clear();
     });
+}
+
+// ============ Playlist Helper Functions ============
+
+/**
+ * Get all libraries (categories) for playlist use
+ */
+export async function getAllLibraries() {
+    const categories = await db.categories.orderBy('order').toArray();
+    return categories.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        description: cat.description || '',
+        tags: cat.tags || [],
+        category: cat.category || '',
+        language: cat.language || 'zh-HK',
+        level: cat.level || 'beginner'
+    }));
+}
+
+/**
+ * Get all words/texts from a library (category)
+ */
+export async function getWordsFromLibrary(libraryId) {
+    const texts = await db.texts.where('categoryId').equals(libraryId).toArray();
+    return texts.map(text => ({
+        id: text.id,
+        front: text.title || text.content,
+        back: text.back || '',
+        pronunciation: text.pronunciation || '',
+        content: text.content,
+        tags: text.tags || []
+    }));
 }
