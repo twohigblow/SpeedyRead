@@ -18,7 +18,7 @@ import {
 } from '../services/gemini-tts';
 import { getSettings } from '../services/db';
 
-export default function GeminiTTSPlayer({ text, textId }) {
+export default function GeminiTTSPlayer({ text, textId, sourceSampleRate = 24000 }) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [apiKey, setApiKey] = useState('');
     const [voice, setVoice] = useState('Puck');
@@ -73,8 +73,9 @@ export default function GeminiTTSPlayer({ text, textId }) {
                 speed,
                 textId,
                 useCache: true,
+                sourceSampleRate,
                 onStart: () => {
-                    console.log('Gemini TTS started');
+                    console.log(`Gemini TTS started (Source: ${sourceSampleRate}Hz)`);
                 },
                 onEnd: () => {
                     console.log('Gemini TTS ended');

@@ -8,6 +8,7 @@ import GeminiTTSPlayer from '../components/GeminiTTSPlayer';
 
 export default function GeminiTTSTest() {
     const [testText, setTestText] = useState('你好，歡迎使用高速聽力訓練。Hello, welcome to SpeedyRead.');
+    const [sampleRate, setSampleRate] = useState(24000);
 
     const samples = [
         {
@@ -32,6 +33,15 @@ export default function GeminiTTSTest() {
         }
     ];
 
+    const SAMPLE_RATES = [
+        { value: 24000, label: '24,000 Hz (Default - Gemini 2.0 Flash)' },
+        { value: 22050, label: '22,050 Hz' },
+        { value: 16000, label: '16,000 Hz' },
+        { value: 32000, label: '32,000 Hz' },
+        { value: 44100, label: '44,100 Hz' },
+        { value: 48000, label: '48,000 Hz' }
+    ];
+
     return (
         <div className="page gemini-tts-test">
             <header className="page-header">
@@ -49,6 +59,28 @@ export default function GeminiTTSTest() {
                         rows={4}
                         placeholder="Enter text to synthesize..."
                     />
+
+                    {/* Sample Rate Selector */}
+                    <div style={{ marginTop: '16px' }}>
+                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+                            Source Sample Rate (Fix Pitch Issues):
+                        </label>
+                        <select
+                            value={sampleRate}
+                            onChange={(e) => setSampleRate(parseInt(e.target.value))}
+                            style={{ padding: '8px', width: '100%', borderRadius: '4px', border: '1px solid #ddd' }}
+                        >
+                            {SAMPLE_RATES.map(rate => (
+                                <option key={rate.value} value={rate.value}>
+                                    {rate.label}
+                                </option>
+                            ))}
+                        </select>
+                        <p style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>
+                            If audio sounds like chipmunk (too fast), try a LOWER rate.<br />
+                            If audio sounds slow/deep, try a HIGHER rate.
+                        </p>
+                    </div>
 
                     {/* Sample Buttons */}
                     <div className="samples">
@@ -73,6 +105,7 @@ export default function GeminiTTSTest() {
                     <GeminiTTSPlayer
                         text={testText}
                         textId={`test-${testText.substring(0, 10)}`}
+                        sourceSampleRate={sampleRate}
                     />
                 </section>
 
@@ -105,11 +138,11 @@ export default function GeminiTTSTest() {
                         <div className="info-card">
                             <h3>3️⃣ Resample to Native Rate</h3>
                             <p>
-                                Resamples from 24kHz to device's native rate (48kHz)
+                                Resamples from source rate ({sampleRate}Hz) to device rate
                                 using linear interpolation.
                             </p>
                             <div className="code-snippet">
-                                <code>resample(24000, 48000)</code>
+                                <code>resample({sampleRate}, deviceRate)</code>
                             </div>
                         </div>
                     </div>

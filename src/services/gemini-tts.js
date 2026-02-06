@@ -167,14 +167,14 @@ export function resampleWithLinearInterpolation(sourceFloat32, sourceSampleRate,
  * 
  * @param {ArrayBuffer} pcmData - Raw 16-bit PCM from Gemini (24kHz)
  * @param {AudioContext} ctx - The already-unlocked AudioContext
+ * @param {number} sourceSampleRate - Source sample rate (default 24000)
  * @returns {AudioBuffer} - Ready-to-play AudioBuffer
  */
-export function processGeminiAudioForIOS(pcmData, ctx) {
+export function processGeminiAudioForIOS(pcmData, ctx, sourceSampleRate = 24000) {
     // Step 1: Decode INT16 to Float32
     const sourceFloat32 = manualDecodeInt16ToFloat32(pcmData);
 
     // Step 2: Resample to device's native rate
-    const sourceSampleRate = 24000; // Gemini's native rate
     const targetSampleRate = ctx.sampleRate; // Device's native rate (typically 44100 or 48000)
 
     console.log(`Resampling from ${sourceSampleRate}Hz to ${targetSampleRate}Hz`);
@@ -184,6 +184,7 @@ export function processGeminiAudioForIOS(pcmData, ctx) {
         sourceSampleRate,
         targetSampleRate
     );
+
 
     // Step 3: Create AudioBuffer and copy data
     const audioBuffer = ctx.createBuffer(
@@ -312,7 +313,7 @@ export async function getCachedGeminiAudio(textId) {
  * 
  * @param {string} text - Text to speak
  * @param {string} apiKey - Gemini API key
- * @param {object} options - { voice, speed, onStart, onEnd, textId }
+ * @param {object} options - { voice, speed, onStart, onEnd, textId, sourceSampleRate }
  */
 export async function playGeminiTTS(text, apiKey, options = {}) {
     const {
@@ -321,7 +322,8 @@ export async function playGeminiTTS(text, apiKey, options = {}) {
         onStart = null,
         onEnd = null,
         textId = null,
-        useCache = true
+        useCache = true,
+        sourceSampleRate = 24000 // Default to Gemini's native rate
     } = options;
 
     try {
@@ -355,7 +357,7 @@ export async function playGeminiTTS(text, apiKey, options = {}) {
         }
 
         // Process audio with iOS-compatible pipeline
-        const audioBuffer = processGeminiAudioForIOS(pcmData, ctx);
+        const audioBuffer = processGeminiAudioForIOS(pcmData, ctx, sourceSampleRate);
 
         onStart?.();
 
@@ -393,6 +395,7 @@ export async function playGeminiTTS(text, apiKey, options = {}) {
         throw error;
     }
 }
+
 
 /**
  * Available Gemini voices
