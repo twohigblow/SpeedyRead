@@ -106,7 +106,11 @@ export async function playTTSAtSpeed(text, speed, options = {}) {
                 englishVoice: googleEnglishVoice,
                 onStart,
                 onBoundary,
-                onEnd
+                onEnd: () => {
+                    // CRITICAL FIX: Signal completion to the polling loop
+                    isPlaying = false;
+                    onEnd?.();
+                }
             });
 
             // Store reference for stop functionality

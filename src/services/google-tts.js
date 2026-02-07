@@ -171,8 +171,9 @@ export async function synthesizeWithTimestamps(text, apiKey, options = {}) {
         input: { ssml },
         voice: {
             languageCode: voiceLanguageCode || langConfig.languageCode,
-            name: voiceName,
-            ssmlGender: langConfig.ssmlGender
+            name: voiceName
+            // ssmlGender is removed because it conflicts with specific voice names
+            // If voiceName is provided, Google uses that exact voice regardless of gender
         },
         audioConfig: {
             // Use MP3 for better iOS compatibility (native support)
