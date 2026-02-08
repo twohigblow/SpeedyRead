@@ -60,10 +60,12 @@ const DEFAULT_SETTINGS = {
     // Flashcard default settings
     flashSpeed: 2.0,          // seconds between cards
     flashTtsSpeed: 1.0,       // TTS playback speed for flashcards
-    flashFontSize: 'large',   // 'small', 'medium', 'large', 'xlarge'
-    flashFontFamily: 'system-ui', // font selection
+    flashFontSize: 48,        // Font size in pixels (24-200)
+    flashFont: 'system',      // 'system' or 'kai' (Free HK Kai)
     flashTtsEnabled: true,    // enable/disable TTS in flashcard mode
-    flashAutoPlay: true       // auto-advance cards
+    flashAutoPlay: true,      // auto-advance cards
+    flashLoops: 1,            // number of times to loop through cards (1-10)
+    flashAutoPlayVoice: false // auto-play voice when manually clicking next/back
 };
 
 // ============ Settings Operations ============

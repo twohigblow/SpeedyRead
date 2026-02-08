@@ -312,6 +312,124 @@ export default function Settings() {
                     />
                 </section>
 
+                {/* Flashcard Settings */}
+                <section className="card mb-md">
+                    <h3 className="mb-md">🗂️ 閃卡設定</h3>
+
+                    {/* Font Selection */}
+                    <div className="mb-md">
+                        <label className="text-muted mb-sm" style={{ fontSize: 'var(--font-size-sm)', display: 'block' }}>
+                            字體
+                        </label>
+                        <div className="flex gap-sm">
+                            <button
+                                className={`btn ${settings.flashFont === 'system' ? 'btn-primary' : 'btn-ghost'}`}
+                                onClick={() => handleUpdate('flashFont', 'system')}
+                                style={{ flex: 1 }}
+                            >
+                                系統字體
+                            </button>
+                            <button
+                                className={`btn ${settings.flashFont === 'kai' ? 'btn-primary' : 'btn-ghost'}`}
+                                onClick={() => handleUpdate('flashFont', 'kai')}
+                                style={{ flex: 1, fontFamily: "'Free HK Kai', serif" }}
+                            >
+                                楷書
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Font Size Slider */}
+                    <div className="mb-md">
+                        <label className="text-muted mb-sm" style={{ fontSize: 'var(--font-size-sm)', display: 'block' }}>
+                            字體大小: {settings.flashFontSize}px
+                        </label>
+                        <input
+                            type="range"
+                            min="24"
+                            max="200"
+                            step="4"
+                            value={settings.flashFontSize}
+                            onChange={(e) => handleUpdate('flashFontSize', parseInt(e.target.value))}
+                            className="slider"
+                            style={{ width: '100%' }}
+                        />
+                        <div className="flex" style={{ justifyContent: 'space-between', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                            <span>24px</span>
+                            <span>200px</span>
+                        </div>
+                    </div>
+
+                    {/* Loop Count */}
+                    <div className="mb-md">
+                        <label className="text-muted mb-sm" style={{ fontSize: 'var(--font-size-sm)', display: 'block' }}>
+                            循環次數: {settings.flashLoops}次
+                        </label>
+                        <input
+                            type="range"
+                            min="1"
+                            max="10"
+                            step="1"
+                            value={settings.flashLoops}
+                            onChange={(e) => handleUpdate('flashLoops', parseInt(e.target.value))}
+                            className="slider"
+                            style={{ width: '100%' }}
+                        />
+                        <div className="flex" style={{ justifyContent: 'space-between', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                            <span>1次</span>
+                            <span>10次</span>
+                        </div>
+                    </div>
+
+                    {/* TTS Speed */}
+                    <div className="mb-md">
+                        <label className="text-muted mb-sm" style={{ fontSize: 'var(--font-size-sm)', display: 'block' }}>
+                            語音速度: {settings.flashTtsSpeed.toFixed(1)}x
+                        </label>
+                        <input
+                            type="range"
+                            min="0.1"
+                            max="8.0"
+                            step="0.1"
+                            value={settings.flashTtsSpeed}
+                            onChange={(e) => handleUpdate('flashTtsSpeed', parseFloat(e.target.value))}
+                            className="slider"
+                            style={{ width: '100%' }}
+                        />
+                        <div className="flex" style={{ justifyContent: 'space-between', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                            <span>0.1x</span>
+                            <span>8.0x</span>
+                        </div>
+                    </div>
+
+                    {/* Auto-play Voice on Navigation */}
+                    <div className="mb-md">
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <input
+                                type="checkbox"
+                                checked={settings.flashAutoPlayVoice}
+                                onChange={(e) => handleUpdate('flashAutoPlayVoice', e.target.checked)}
+                            />
+                            <span>手動切換時自動播放語音</span>
+                        </label>
+                        <p className="text-muted mt-sm" style={{ fontSize: 'var(--font-size-xs)' }}>
+                            點擊「上一個」或「下一個」時自動播放該字詞的語音
+                        </p>
+                    </div>
+
+                    {/* Enable Voice */}
+                    <div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <input
+                                type="checkbox"
+                                checked={settings.flashTtsEnabled}
+                                onChange={(e) => handleUpdate('flashTtsEnabled', e.target.checked)}
+                            />
+                            <span>啟用語音</span>
+                        </label>
+                    </div>
+                </section>
+
                 {/* Gemini API Key */}
                 <section className="card mb-md">
                     <h3 className="mb-md">Gemini API 金鑰</h3>

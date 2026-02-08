@@ -16,6 +16,7 @@ export default function FlashCard() {
     const [text, setText] = useState(null);
     const [cards, setCards] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [currentLoop, setCurrentLoop] = useState(1);
     const [isPlaying, setIsPlaying] = useState(false);
     const [settings, setSettings] = useState(null);
     const [showSettings, setShowSettings] = useState(false);
@@ -24,10 +25,12 @@ export default function FlashCard() {
     // Local settings (can be different from global settings)
     const [flashSpeed, setFlashSpeed] = useState(2.0);
     const [ttsSpeed, setTtsSpeed] = useState(1.0);
-    const [fontSize, setFontSize] = useState('large');
-    const [fontFamily, setFontFamily] = useState('system-ui');
+    const [fontSize, setFontSize] = useState(48);
+    const [font, setFont] = useState('system');
     const [ttsEnabled, setTtsEnabled] = useState(true);
     const [autoPlay, setAutoPlay] = useState(true);
+    const [maxLoops, setMaxLoops] = useState(1);
+    const [autoPlayVoice, setAutoPlayVoice] = useState(false);
     const [error, setError] = useState(null);
 
     const timerRef = useRef(null);
@@ -58,10 +61,12 @@ export default function FlashCard() {
             // Load settings
             setFlashSpeed(settingsData.flashSpeed || 2.0);
             setTtsSpeed(settingsData.flashTtsSpeed || 1.0);
-            setFontSize(settingsData.flashFontSize || 'large');
-            setFontFamily(settingsData.flashFontFamily || 'system-ui');
+            setFontSize(settingsData.flashFontSize || 48);
+            setFont(settingsData.flashFont || 'system');
             setTtsEnabled(settingsData.flashTtsEnabled !== false);
             setAutoPlay(settingsData.flashAutoPlay !== false);
+            setMaxLoops(settingsData.flashLoops || 1);
+            setAutoPlayVoice(settingsData.flashAutoPlayVoice || false);
 
             // Split text into cards
             const cardArray = splitIntoCards(textData.content);
@@ -205,8 +210,17 @@ export default function FlashCard() {
         if (currentIndex < cards.length - 1) {
             const nextIndex = currentIndex + 1;
             setCurrentIndex(nextIndex);
-            if (!autoPlay) {
+            if (autoPlayVoice && ttsEnabled) {
                 pronounceCard(cards[nextIndex]);
+            }
+        } else {
+            // At last card - loop back to first if more loops remaining
+            if (currentLoop < maxLoops) {
+                setCurrentIndex(0);
+                setCurrentLoop(prev => prev + 1);
+                if (autoPlayVoice && ttsEnabled) {
+                    pronounceCard(cards[0]);
+                }
             }
         }
     };
@@ -215,7 +229,7 @@ export default function FlashCard() {
         if (currentIndex > 0) {
             const prevIndex = currentIndex - 1;
             setCurrentIndex(prevIndex);
-            if (!autoPlay) {
+            if (autoPlayVoice && ttsEnabled) {
                 pronounceCard(cards[prevIndex]);
             }
         }
@@ -238,9 +252,11 @@ export default function FlashCard() {
             flashSpeed,
             flashTtsSpeed: ttsSpeed,
             flashFontSize: fontSize,
-            flashFontFamily: fontFamily,
+            flashFont: font,
             flashTtsEnabled: ttsEnabled,
-            flashAutoPlay: autoPlay
+            flashAutoPlay: autoPlay,
+            flashLoops: maxLoops,
+            flashAutoPlayVoice: autoPlayVoice
         });
     };
 
@@ -249,7 +265,7 @@ export default function FlashCard() {
         if (settings) {
             saveCurrentSettings();
         }
-    }, [flashSpeed, ttsSpeed, fontSize, fontFamily, ttsEnabled, autoPlay]);
+    }, [flashSpeed, ttsSpeed, fontSize, font, ttsEnabled, autoPlay, maxLoops, autoPlayVoice]);
 
     if (loading) {
         return (
@@ -395,7 +411,7 @@ export default function FlashCard() {
                 {/* Progress */}
                 <div className="flashcard-progress mb-md">
                     <span className="text-muted">
-                        {currentIndex + 1} / {cards.length}
+                        {currentIndex + 1} / {cards.length} {maxLoops > 1 && `(Loop ${currentLoop}/${maxLoops})`}
                     </span>
                     <div className="progress-bar">
                         <div
@@ -409,8 +425,8 @@ export default function FlashCard() {
                 <div
                     className="flashcard-display card"
                     style={{
-                        fontSize: getFontSizeValue(fontSize),
-                        fontFamily: fontFamily
+                        fontSize: `${fontSize}px`,
+                        fontFamily: font === 'kai' ? "'Free HK Kai', serif" : 'system-ui, -apple-system, sans-serif'
                     }}
                 >
                     {currentCard}
@@ -430,7 +446,7 @@ export default function FlashCard() {
                         <button
                             className="btn btn-ghost"
                             onClick={handleNext}
-                            disabled={currentIndex === cards.length - 1 || isPlaying}
+                            disabled={isPlaying}
                             style={{ flex: 1 }}
                         >
                             下一張 →
