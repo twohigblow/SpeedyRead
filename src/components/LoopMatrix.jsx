@@ -4,7 +4,8 @@
  */
 import { useState } from 'react';
 
-const SPEED_OPTIONS = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+const MAX_SPEED = 10.0;
+const MIN_SPEED = 0.1;
 
 export default function LoopMatrix({
     config = [{ speed: 1.0 }],
@@ -14,8 +15,12 @@ export default function LoopMatrix({
     const [stages, setStages] = useState(config);
 
     const handleSpeedChange = (index, speed) => {
+        let value = parseFloat(speed);
+        if (isNaN(value)) value = 1.0;
+        value = Math.min(MAX_SPEED, Math.max(MIN_SPEED, value));
+
         const newStages = [...stages];
-        newStages[index] = { ...newStages[index], speed: parseFloat(speed) };
+        newStages[index] = { ...newStages[index], speed: value };
         setStages(newStages);
         onChange?.(newStages);
     };
@@ -55,18 +60,21 @@ export default function LoopMatrix({
                             第 {index + 1} 次
                         </div>
 
-                        <select
-                            className="input"
-                            value={stage.speed}
-                            onChange={(e) => handleSpeedChange(index, e.target.value)}
-                            style={{ flex: 1, maxWidth: '120px' }}
-                        >
-                            {SPEED_OPTIONS.map(speed => (
-                                <option key={speed} value={speed}>
-                                    {speed}x
-                                </option>
-                            ))}
-                        </select>
+                        <div className="flex items-center gap-sm" style={{ flex: 1 }}>
+                            <input
+                                type="range"
+                                min={MIN_SPEED}
+                                max={MAX_SPEED}
+                                step="0.1"
+                                value={stage.speed}
+                                onChange={(e) => handleSpeedChange(index, e.target.value)}
+                                className="slider"
+                                style={{ flex: 1 }}
+                            />
+                            <span style={{ minWidth: '45px', textAlign: 'right', fontSize: 'var(--font-size-sm)' }}>
+                                {stage.speed.toFixed(1)}x
+                            </span>
+                        </div>
 
                         {stages.length > 1 && (
                             <button

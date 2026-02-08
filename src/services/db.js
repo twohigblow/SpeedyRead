@@ -71,12 +71,35 @@ const DEFAULT_SETTINGS = {
 // ============ Settings Operations ============
 
 export async function getSettings() {
-    let settings = await db.settings.get('user-settings');
-    if (!settings) {
-        settings = { ...DEFAULT_SETTINGS };
-        await db.settings.put(settings);
+    try {
+        const storedSettings = await db.settings.get('user-settings');
+
+        if (!storedSettings) {
+            const initialSettings = { ...DEFAULT_SETTINGS };
+            await db.settings.put(initialSettings);
+            return initialSettings;
+        }
+
+        // Merge stored settings with defaults to ensure all fields exist
+        // This handles schema migrations and missing fields gracefully
+        const mergedSettings = { ...DEFAULT_SETTINGS, ...storedSettings };
+
+        // Check for specific incompatible values and reset if needed
+        // e.g. if saved speed is outside valid range
+        if (mergedSettings.flashTtsSpeed < 0.1 || mergedSettings.flashTtsSpeed > 8.0) {
+            mergedSettings.flashTtsSpeed = DEFAULT_SETTINGS.flashTtsSpeed;
+        }
+
+        // If merged settings differ from stored (meaning we added new fields), update DB
+        if (JSON.stringify(mergedSettings) !== JSON.stringify(storedSettings)) {
+            await db.settings.put(mergedSettings);
+        }
+
+        return mergedSettings;
+    } catch (err) {
+        console.error('Error loading settings, using defaults:', err);
+        return { ...DEFAULT_SETTINGS };
     }
-    return settings;
 }
 
 export async function updateSettings(updates) {
