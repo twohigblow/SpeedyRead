@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getText, getSettings, updateSettings } from '../services/db';
-import { splitIntoCards, getFontSizeValue, FONT_FAMILIES, FONT_SIZES } from '../utils/flashcard-utils';
+import { splitIntoCards } from '../utils/flashcard-utils';
 import { speak as speakOffline, stop as stopOffline } from '../services/tts';
 import { synthesizeWithTimestamps } from '../services/google-tts';
 
@@ -35,6 +35,7 @@ export default function FlashCard() {
 
     const timerRef = useRef(null);
     const abortRef = useRef(false);
+    const audioRef = useRef(null); // Track current audio for cancellation
 
     useEffect(() => {
         loadData();
@@ -84,12 +85,23 @@ export default function FlashCard() {
             clearTimeout(timerRef.current);
             timerRef.current = null;
         }
+        // Stop any playing audio
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current = null;
+        }
         stopOffline();
         setIsPlaying(false);
     };
 
     const pronounceCard = async (cardText) => {
         if (!ttsEnabled || !cardText) return;
+
+        // Cancel any currently playing audio to prevent overlap/errors
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current = null;
+        }
 
         try {
             const useGoogleTTS = settings?.ttsMode === 'online' && settings?.googleTtsApiKey;
@@ -120,6 +132,7 @@ export default function FlashCard() {
                 const audioUrl = URL.createObjectURL(audioBlob);
 
                 const audio = new Audio(audioUrl);
+                audioRef.current = audio; // Track for cancellation
 
                 // Wait for audio to load (critical for iOS)
                 await new Promise((resolve, reject) => {
@@ -190,21 +203,37 @@ export default function FlashCard() {
         abortRef.current = false;
         setIsPlaying(true);
 
-        for (let i = currentIndex; i < cards.length; i++) {
+        // Loop through cards multiple times based on maxLoops
+        for (let loop = currentLoop; loop <= maxLoops; loop++) {
             if (abortRef.current) break;
 
-            await playCard(i);
+            // Determine starting index (continue from current on first loop, start from 0 on subsequent loops)
+            const startIndex = loop === currentLoop ? currentIndex : 0;
 
-            if (abortRef.current || !autoPlay || i === cards.length - 1) break;
+            for (let i = startIndex; i < cards.length; i++) {
+                if (abortRef.current) break;
 
-            // Wait for flash speed delay
-            await new Promise(resolve => {
-                timerRef.current = setTimeout(resolve, flashSpeed * 1000);
-            });
+                setCurrentIndex(i);
+                await playCard(i);
+
+                if (abortRef.current) break;
+
+                // Wait for flash speed delay (except after last card of last loop)
+                if (!(loop === maxLoops && i === cards.length - 1)) {
+                    await new Promise(resolve => {
+                        timerRef.current = setTimeout(resolve, flashSpeed * 1000);
+                    });
+                }
+            }
+
+            // Update loop counter after completing each loop
+            if (loop < maxLoops && !abortRef.current) {
+                setCurrentLoop(loop + 1);
+            }
         }
 
         setIsPlaying(false);
-    }, [cards, currentIndex, flashSpeed, autoPlay]);
+    }, [cards, currentIndex, currentLoop, maxLoops, flashSpeed, autoPlay]);
 
     const handleNext = () => {
         if (currentIndex < cards.length - 1) {
@@ -358,30 +387,51 @@ export default function FlashCard() {
 
                         {/* Font Size */}
                         <div className="mb-md">
-                            <label className="label">字體大小</label>
-                            <select
-                                className="input"
+                            <label className="label">字體大小: {fontSize}px</label>
+                            <input
+                                type="range"
+                                min="24"
+                                max="200"
+                                step="4"
                                 value={fontSize}
-                                onChange={(e) => setFontSize(e.target.value)}
-                            >
-                                {FONT_SIZES.map(size => (
-                                    <option key={size.value} value={size.value}>{size.label}</option>
-                                ))}
-                            </select>
+                                onChange={(e) => setFontSize(parseInt(e.target.value))}
+                                className="slider"
+                            />
                         </div>
 
-                        {/* Font Family */}
+                        {/* Font Selection */}
                         <div className="mb-md">
                             <label className="label">字體</label>
-                            <select
-                                className="input"
-                                value={fontFamily}
-                                onChange={(e) => setFontFamily(e.target.value)}
-                            >
-                                {FONT_FAMILIES.map(font => (
-                                    <option key={font.value} value={font.value}>{font.label}</option>
-                                ))}
-                            </select>
+                            <div className="flex gap-sm">
+                                <button
+                                    className={`btn ${font === 'system' ? 'btn-primary' : 'btn-ghost'}`}
+                                    onClick={() => setFont('system')}
+                                    style={{ flex: 1 }}
+                                >
+                                    系統
+                                </button>
+                                <button
+                                    className={`btn ${font === 'kai' ? 'btn-primary' : 'btn-ghost'}`}
+                                    onClick={() => setFont('kai')}
+                                    style={{ flex: 1, fontFamily: "'Free HK Kai', serif" }}
+                                >
+                                    楷書
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Loop Count */}
+                        <div className="mb-md">
+                            <label className="label">循環次數: {maxLoops}次</label>
+                            <input
+                                type="range"
+                                min="1"
+                                max="10"
+                                step="1"
+                                value={maxLoops}
+                                onChange={(e) => setMaxLoops(parseInt(e.target.value))}
+                                className="slider"
+                            />
                         </div>
 
                         {/* TTS Toggle */}
