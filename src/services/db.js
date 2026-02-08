@@ -42,6 +42,19 @@ class SpeedyReadDB extends Dexie {
 
 export const db = new SpeedyReadDB();
 
+// Category color palette for subconscious learning
+export const CATEGORY_COLORS = {
+    blue: '#3B82F6',
+    green: '#10B981',
+    yellow: '#F59E0B',
+    purple: '#8B5CF6',
+    red: '#EF4444',
+    orange: '#F97316',
+    cyan: '#06B6D4',
+    pink: '#EC4899',
+    none: null
+};
+
 // Default settings
 const DEFAULT_SETTINGS = {
     id: 'user-settings',
@@ -65,7 +78,9 @@ const DEFAULT_SETTINGS = {
     flashTtsEnabled: true,    // enable/disable TTS in flashcard mode
     flashAutoPlay: true,      // auto-advance cards
     flashLoops: 1,            // number of times to loop through cards (1-10)
-    flashAutoPlayVoice: false // auto-play voice when manually clicking next/back
+    flashAutoPlayVoice: false, // auto-play voice when manually clicking next/back
+    flashDisplayMode: 'flash', // 'flash' (high contrast) or 'sleep' (low stimulation)
+    flashShowCategoryColors: true // show category color borders for subconscious learning
 };
 
 // ============ Settings Operations ============

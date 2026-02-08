@@ -418,7 +418,7 @@ export default function Settings() {
                     </div>
 
                     {/* Enable Voice */}
-                    <div>
+                    <div className="mb-md">
                         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                             <input
                                 type="checkbox"
@@ -427,6 +427,48 @@ export default function Settings() {
                             />
                             <span>啟用語音</span>
                         </label>
+                    </div>
+
+                    {/* Display Mode */}
+                    <div className="mb-md">
+                        <label className="text-muted mb-sm" style={{ fontSize: 'var(--font-size-sm)', display: 'block' }}>
+                            顯示模式
+                        </label>
+                        <div className="flex gap-sm">
+                            <button
+                                className={`btn ${settings.flashDisplayMode === 'flash' ? 'btn-primary' : 'btn-ghost'}`}
+                                onClick={() => handleUpdate('flashDisplayMode', 'flash')}
+                                style={{ flex: 1 }}
+                            >
+                                ⚡ 專注模式
+                            </button>
+                            <button
+                                className={`btn ${settings.flashDisplayMode === 'sleep' ? 'btn-primary' : 'btn-ghost'}`}
+                                onClick={() => handleUpdate('flashDisplayMode', 'sleep')}
+                                style={{ flex: 1 }}
+                            >
+                                🌙 睡眠模式
+                            </button>
+                        </div>
+                        <p className="text-muted mt-sm" style={{ fontSize: 'var(--font-size-xs)' }}>
+                            專注模式：高對比度，適合主動學習<br />
+                            睡眠模式：柔和色調，適合睡前聆聽
+                        </p>
+                    </div>
+
+                    {/* Category Color Borders */}
+                    <div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <input
+                                type="checkbox"
+                                checked={settings.flashShowCategoryColors}
+                                onChange={(e) => handleUpdate('flashShowCategoryColors', e.target.checked)}
+                            />
+                            <span>顯示分類顏色邊框</span>
+                        </label>
+                        <p className="text-muted mt-sm" style={{ fontSize: 'var(--font-size-xs)' }}>
+                            用顏色幫助大腦快速分類記憶
+                        </p>
                     </div>
                 </section>
 

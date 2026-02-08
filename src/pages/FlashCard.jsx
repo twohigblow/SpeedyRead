@@ -4,7 +4,7 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { getText, getSettings, updateSettings } from '../services/db';
+import { getText, getSettings, updateSettings, getCategory, CATEGORY_COLORS } from '../services/db';
 import { splitIntoCards } from '../utils/flashcard-utils';
 import { speak as speakOffline, stop as stopOffline } from '../services/tts';
 import { synthesizeWithTimestamps } from '../services/google-tts';
@@ -14,6 +14,7 @@ export default function FlashCard() {
     const navigate = useNavigate();
 
     const [text, setText] = useState(null);
+    const [category, setCategory] = useState(null);
     const [cards, setCards] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [currentLoop, setCurrentLoop] = useState(1);
@@ -58,6 +59,12 @@ export default function FlashCard() {
 
             setText(textData);
             setSettings(settingsData);
+
+            // Load category for color coding
+            if (textData?.categoryId) {
+                const categoryData = await getCategory(textData.categoryId);
+                setCategory(categoryData);
+            }
 
             // Load settings
             setFlashSpeed(settingsData.flashSpeed || 2.0);
@@ -319,8 +326,30 @@ export default function FlashCard() {
 
     const currentCard = cards[currentIndex];
 
+    // Compute display mode styles
+    const displayModeStyles = settings?.flashDisplayMode === 'sleep'
+        ? {
+            backgroundColor: '#1A1A1A',
+            color: '#E0E0E0'
+        }
+        : {
+            backgroundColor: '#FFFFFF',
+            color: '#000000'
+        };
+
+    // Compute category border (if enabled and category has color)
+    const categoryBorderStyle = settings?.flashShowCategoryColors && category?.categoryColor && CATEGORY_COLORS[category.categoryColor]
+        ? {
+            border: `6px solid ${CATEGORY_COLORS[category.categoryColor]}`,
+            boxShadow: `0 0 20px ${CATEGORY_COLORS[category.categoryColor]}40`
+        }
+        : {};
+
+    // Page background for immersive experience
+    const pageBackgroundColor = settings?.flashDisplayMode === 'sleep' ? '#0A0A0A' : '#F5F5F5';
+
     return (
-        <div className="page">
+        <div className="page" style={{ backgroundColor: pageBackgroundColor, transition: 'background-color 0.3s ease' }}>
             <div className="container">
                 {/* Header */}
                 <div className="page-header">
@@ -434,6 +463,33 @@ export default function FlashCard() {
                             />
                         </div>
 
+                        {/* Display Mode */}
+                        <div className="mb-md">
+                            <label className="label">顯示模式</label>
+                            <div className="flex gap-sm">
+                                <button
+                                    className={`btn ${settings?.flashDisplayMode === 'flash' ? 'btn-primary' : 'btn-ghost'}`}
+                                    onClick={() => {
+                                        updateSettings({ flashDisplayMode: 'flash' });
+                                        setSettings({ ...settings, flashDisplayMode: 'flash' });
+                                    }}
+                                    style={{ flex: 1 }}
+                                >
+                                    ⚡ 專注
+                                </button>
+                                <button
+                                    className={`btn ${settings?.flashDisplayMode === 'sleep' ? 'btn-primary' : 'btn-ghost'}`}
+                                    onClick={() => {
+                                        updateSettings({ flashDisplayMode: 'sleep' });
+                                        setSettings({ ...settings, flashDisplayMode: 'sleep' });
+                                    }}
+                                    style={{ flex: 1 }}
+                                >
+                                    🌙 睡眠
+                                </button>
+                            </div>
+                        </div>
+
                         {/* TTS Toggle */}
                         <div className="mb-md flex items-center gap-md">
                             <label className="label" style={{ marginBottom: 0 }}>啟用語音</label>
@@ -476,7 +532,10 @@ export default function FlashCard() {
                     className="flashcard-display card"
                     style={{
                         fontSize: `${fontSize}px`,
-                        fontFamily: font === 'kai' ? "'Free HK Kai', serif" : 'system-ui, -apple-system, sans-serif'
+                        fontFamily: font === 'kai' ? "'Free HK Kai', serif" : 'system-ui, -apple-system, sans-serif',
+                        ...displayModeStyles,
+                        ...categoryBorderStyle,
+                        transition: 'all 0.3s ease'
                     }}
                 >
                     {currentCard}
