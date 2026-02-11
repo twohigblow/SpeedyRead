@@ -17,15 +17,20 @@ import {
     estimatePlaylistDuration,
     formatDuration
 } from '../services/playlist.js';
-import { getAllLibraries } from '../services/db.js';
+import { getTexts, getCategories } from '../services/db.js';
 import LoopConfigurator from '../components/LoopConfigurator.jsx';
 
 export default function Playlist() {
     const navigate = useNavigate();
     const [playlist, setPlaylist] = useState([]);
-    const [libraries, setLibraries] = useState([]);
+    const [availableTexts, setAvailableTexts] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [allTags, setAllTags] = useState([]);
     const [showAddDialog, setShowAddDialog] = useState(false);
-    const [selectedLibrary, setSelectedLibrary] = useState(null);
+    const [selectedTexts, setSelectedTexts] = useState([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState(null);
+    const [selectedTags, setSelectedTags] = useState([]);
     const [editingItem, setEditingItem] = useState(null);
     const [draggedIndex, setDraggedIndex] = useState(null);
 
@@ -37,29 +42,58 @@ export default function Playlist() {
         const storedPlaylist = loadPlaylist();
         setPlaylist(storedPlaylist);
 
-        const allLibraries = await getAllLibraries();
-        setLibraries(allLibraries);
+        // Load all texts
+        const texts = await getTexts();
+        setAvailableTexts(texts);
+
+        // Load categories
+        const cats = await getCategories();
+        setCategories(cats);
+
+        // Extract unique tags
+        const tags = new Set();
+        texts.forEach(text => {
+            text.tags?.forEach(tag => tags.add(tag));
+        });
+        setAllTags(Array.from(tags));
     };
 
-    const handleAddLibrary = () => {
-        if (!selectedLibrary) return;
+    const toggleTextSelection = (textId) => {
+        setSelectedTexts(prev =>
+            prev.includes(textId)
+                ? prev.filter(id => id !== textId)
+                : [...prev, textId]
+        );
+    };
 
-        const library = libraries.find(lib => lib.id === selectedLibrary);
-        const newItem = createPlaylistItem(library.id, library.name, {
-            loops: [{ speed: 1.0, volume: 80, pitch: 0 }],
-            gapBetweenLoops: 2000,
-            sleepMode: false
+    const handleAddTexts = () => {
+        if (selectedTexts.length === 0) return;
+
+        // Add each selected text as a playlist item
+        const newItems = selectedTexts.map(textId => {
+            const text = availableTexts.find(t => t.id === textId);
+            return createPlaylistItem(text.id, text.title || 'Untitled', {
+                loops: [{ speed: 1.0, volume: 80, pitch: 0 }],
+                gapBetweenLoops: 2000,
+                sleepMode: false,
+                isText: true
+            });
         });
 
-        const updated = [...playlist, newItem];
+        const updated = [...playlist, ...newItems];
         setPlaylist(updated);
         savePlaylist(updated);
 
         setShowAddDialog(false);
-        setSelectedLibrary(null);
+        setSelectedTexts([]);
+        setSearchQuery('');
+        setSelectedCategory(null);
+        setSelectedTags([]);
 
-        // Auto-open editing for the new item
-        setEditingItem(newItem.id);
+        // Auto-open editing for the first new item
+        if (newItems.length > 0) {
+            setEditingItem(newItems[0].id);
+        }
     };
 
     const handleRemove = (itemId) => {
@@ -135,7 +169,7 @@ export default function Playlist() {
             {playlist.length > 0 && (
                 <div className="stats-bar">
                     <div className="stat">
-                        <span className="stat-label">Libraries:</span>
+                        <span className="stat-label">Items:</span>
                         <span className="stat-value">{playlist.length}</span>
                     </div>
                     <div className="stat">
@@ -157,13 +191,13 @@ export default function Playlist() {
                 {playlist.length === 0 && (
                     <div className="empty-state">
                         <div className="empty-icon">🎵</div>
-                        <h3>No Libraries in Playlist</h3>
-                        <p>Add libraries to create your custom learning sequence</p>
+                        <h3>No Texts in Playlist</h3>
+                        <p>Add texts to create your custom learning sequence</p>
                         <button
                             className="btn btn-primary"
                             onClick={() => setShowAddDialog(true)}
                         >
-                            ➕ Add First Library
+                            ➕ Add First Text
                         </button>
                     </div>
                 )}
@@ -263,7 +297,7 @@ export default function Playlist() {
                             className="add-item-btn"
                             onClick={() => setShowAddDialog(true)}
                         >
-                            ➕ Add Library
+                            ➕ Add Texts
                         </button>
                     </div>
                 )}
@@ -274,7 +308,7 @@ export default function Playlist() {
                 <div className="dialog-overlay" onClick={() => setShowAddDialog(false)}>
                     <div className="dialog" onClick={(e) => e.stopPropagation()}>
                         <div className="dialog-header">
-                            <h3>Add Library to Playlist</h3>
+                            <h3>Add Texts to Playlist</h3>
                             <button
                                 className="btn btn-icon"
                                 onClick={() => setShowAddDialog(false)}
@@ -284,38 +318,115 @@ export default function Playlist() {
                         </div>
 
                         <div className="dialog-content">
-                            {libraries.length === 0 ? (
-                                <div className="empty-message">
-                                    <p>No libraries available. Create a library first!</p>
-                                    <button
-                                        className="btn btn-primary"
-                                        onClick={() => navigate('/library')}
-                                    >
-                                        Go to Library
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="library-list">
-                                    {libraries.map(lib => (
-                                        <div
-                                            key={lib.id}
-                                            className={`library-option ${selectedLibrary === lib.id ? 'selected' : ''}`}
-                                            onClick={() => setSelectedLibrary(lib.id)}
-                                        >
-                                            <div className="library-icon">📚</div>
-                                            <div className="library-info">
-                                                <div className="library-name">{lib.name}</div>
-                                                <div className="library-meta">
-                                                    {lib.wordCount || 0} words
-                                                </div>
-                                            </div>
-                                            {selectedLibrary === lib.id && (
-                                                <div className="check-icon">✓</div>
-                                            )}
-                                        </div>
+                            {/* Search Bar */}
+                            <div className="search-bar">
+                                <input
+                                    type="text"
+                                    placeholder="🔍 Search by title or content..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="search-input"
+                                />
+                            </div>
+
+                            {/* Category Filter */}
+                            <div className="filter-section">
+                                <label>Category:</label>
+                                <select
+                                    value={selectedCategory || ''}
+                                    onChange={(e) => setSelectedCategory(e.target.value ? parseInt(e.target.value) : null)}
+                                    className="filter-select"
+                                >
+                                    <option value="">All Categories</option>
+                                    {categories.map(cat => (
+                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
                                     ))}
+                                </select>
+                            </div>
+
+                            {/* Tag Filter */}
+                            {allTags.length > 0 && (
+                                <div className="filter-section">
+                                    <label>Tags:</label>
+                                    <div className="tag-chips">
+                                        {allTags.map(tag => (
+                                            <button
+                                                key={tag}
+                                                className={`tag-chip ${selectedTags.includes(tag) ? 'active' : ''}`}
+                                                onClick={() => {
+                                                    setSelectedTags(prev =>
+                                                        prev.includes(tag)
+                                                            ? prev.filter(t => t !== tag)
+                                                            : [...prev, tag]
+                                                    );
+                                                }}
+                                            >
+                                                {tag}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
+
+                            {/* Text List */}
+                            <div className="text-list">
+                                {(() => {
+                                    // Filter texts
+                                    const filtered = availableTexts.filter(text => {
+                                        // Search query filter
+                                        if (searchQuery) {
+                                            const query = searchQuery.toLowerCase();
+                                            const matchesTitle = text.title?.toLowerCase().includes(query);
+                                            const matchesContent = text.content.toLowerCase().includes(query);
+                                            if (!matchesTitle && !matchesContent) return false;
+                                        }
+
+                                        // Category filter
+                                        if (selectedCategory && text.categoryId !== selectedCategory) {
+                                            return false;
+                                        }
+
+                                        // Tag filter
+                                        if (selectedTags.length > 0) {
+                                            const hasTag = selectedTags.some(tag => text.tags?.includes(tag));
+                                            if (!hasTag) return false;
+                                        }
+
+                                        return true;
+                                    });
+
+                                    return filtered.length === 0 ? (
+                                        <div className="empty-message">
+                                            <p>No texts match your filters</p>
+                                        </div>
+                                    ) : (
+                                        filtered.map(text => (
+                                            <div
+                                                key={text.id}
+                                                className={`text-option ${selectedTexts.includes(text.id) ? 'selected' : ''}`}
+                                                onClick={() => toggleTextSelection(text.id)}
+                                            >
+                                                <div className="text-info">
+                                                    <div className="text-title">{text.title || 'Untitled'}</div>
+                                                    <div className="text-preview">
+                                                        {text.content.substring(0, 50)}...
+                                                    </div>
+                                                    {text.tags?.length > 0 && (
+                                                        <div className="text-tags">
+                                                            {text.tags.map(tag => (
+                                                                <span key={tag} className="mini-tag">#{tag}</span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {selectedTexts.includes(text.id) && (
+                                                    <div className="check-icon">✓</div>
+                                                )}
+                                            </div>
+                                        ))
+                                    );
+                                })()}
+                            </div>
                         </div>
 
                         <div className="dialog-footer">
@@ -327,10 +438,10 @@ export default function Playlist() {
                             </button>
                             <button
                                 className="btn btn-primary"
-                                onClick={handleAddLibrary}
-                                disabled={!selectedLibrary}
+                                onClick={handleAddTexts}
+                                disabled={selectedTexts.length === 0}
                             >
-                                Add to Playlist
+                                Add {selectedTexts.length > 0 ? `(${selectedTexts.length})` : ''} to Playlist
                             </button>
                         </div>
                     </div>
@@ -554,6 +665,7 @@ export default function Playlist() {
 
                 .dialog {
                     background: white;
+                    color: #000; /* Force black text */
                     border-radius: 12px;
                     max-width: 500px;
                     width: 100%;
@@ -569,16 +681,19 @@ export default function Playlist() {
                     align-items: center;
                     padding: 20px;
                     border-bottom: 1px solid var(--border-color, #eee);
+                    color: #000; /* Force black text */
                 }
 
                 .dialog-header h3 {
                     margin: 0;
+                    color: #000; /* Force black text */
                 }
 
                 .dialog-content {
                     flex: 1;
                     overflow-y: auto;
                     padding: 20px;
+                    color: #000; /* Force black text */
                 }
 
                 .library-list {
@@ -596,6 +711,7 @@ export default function Playlist() {
                     border-radius: 8px;
                     cursor: pointer;
                     transition: all 0.2s;
+                    color: #000; /* Force black text */
                 }
 
                 .library-option:hover {
@@ -619,6 +735,7 @@ export default function Playlist() {
                 .library-name {
                     font-weight: 600;
                     margin-bottom: 2px;
+                    color: #000; /* Force black text */
                 }
 
                 .library-meta {
@@ -640,9 +757,138 @@ export default function Playlist() {
                     border-top: 1px solid var(--border-color, #eee);
                 }
 
+                .dialog-footer .btn {
+                    color: #000; /* Force black text on buttons */
+                }
+
                 .empty-message {
                     text-align: center;
                     padding: 40px 20px;
+                    color: #000; /* Force black text */
+                }
+
+                .search-bar {
+                    margin-bottom: 16px;
+                }
+
+                .search-input {
+                    width: 100%;
+                    padding: 10px 12px;
+                    border: 2px solid #ddd;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    color: #000;
+                    background: white;
+                }
+
+                .search-input:focus {
+                    outline: none;
+                    border-color: var(--primary-color, #4CAF50);
+                }
+
+                .filter-section {
+                    margin-bottom: 16px;
+                }
+
+                .filter-section label {
+                    display: block;
+                    margin-bottom: 8px;
+                    font-weight: 600;
+                    font-size: 14px;
+                    color: #000;
+                }
+
+                .filter-select {
+                    width: 100%;
+                    padding: 8px 12px;
+                    border: 2px solid #ddd;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    color: #000;
+                    background: white;
+                }
+
+                .tag-chips {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 8px;
+                }
+
+                .tag-chip {
+                    padding: 6px 12px;
+                    border: 2px solid #ddd;
+                    border-radius: 16px;
+                    background: white;
+                    color: #000;
+                    cursor: pointer;
+                    font-size: 13px;
+                    transition: all 0.2s;
+                }
+
+                .tag-chip:hover {
+                    border-color: var(--primary-color, #4CAF50);
+                }
+
+                .tag-chip.active {
+                    background: var(--primary-color, #4CAF50);
+                    border-color: var(--primary-color, #4CAF50);
+                    color: white;
+                }
+
+                .text-list {
+                    max-height: 400px;
+                    overflow-y: auto;
+                    margin-top: 16px;
+                }
+
+                .text-option {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 12px;
+                    border: 2px solid #ddd;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    margin-bottom: 8px;
+                    color: #000;
+                }
+
+                .text-option:hover {
+                    border-color: var(--primary-color, #4CAF50);
+                    background: rgba(76, 175, 80, 0.05);
+                }
+
+                .text-option.selected {
+                    border-color: var(--primary-color, #4CAF50);
+                    background: rgba(76, 175, 80, 0.1);
+                }
+
+                .text-info {
+                    flex: 1;
+                }
+
+                .text-title {
+                    font-weight: 600;
+                    margin-bottom: 4px;
+                    color: #000;
+                }
+
+                .text-preview {
+                    font-size: 13px;
+                    color: #666;
+                    margin-bottom: 4px;
+                }
+
+                .text-tags {
+                    display: flex;
+                    gap: 4px;
+                    flex-wrap: wrap;
+                }
+
+                .mini-tag {
+                    font-size: 11px;
+                    color: #888;
                 }
 
                 @media (max-width: 768px) {
@@ -657,6 +903,11 @@ export default function Playlist() {
 
                     .item-info {
                         flex-basis: 100%;
+                    }
+
+                    .tag-chips {
+                        max-height: 120px;
+                        overflow-y: auto;
                     }
                 }
             `}</style>

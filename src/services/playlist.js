@@ -6,7 +6,7 @@
  */
 
 import { playTTSAtSpeed } from './tts-cache.js';
-import { getAllLibraries, getWordsFromLibrary } from './db.js';
+import { getAllLibraries, getWordsFromLibrary, getText } from './db.js';
 
 // LocalStorage key for playlists
 const PLAYLIST_STORAGE_KEY = 'SPEEDY_READ_NIGHTLY_FLOW';
@@ -15,11 +15,13 @@ const PLAYLIST_STORAGE_KEY = 'SPEEDY_READ_NIGHTLY_FLOW';
  * Data structure for a playlist item
  * @typedef {Object} PlaylistItem
  * @property {string} id - Unique ID
- * @property {string} libraryId - Reference to library
- * @property {string} name - Library name
+ * @property {string} libraryId - Reference to library (null if isText)
+ * @property {string} textId - Reference to text (null if library)
+ * @property {string} name - Library/Text name
  * @property {Array<Loop>} loops - Array of speed configurations
  * @property {number} gapBetweenLoops - Gap in ms between loops
  * @property {boolean} sleepMode - Enable sleep mode for this item
+ * @property {boolean} isText - True if this is a single text, false if library
  */
 
 /**
@@ -42,20 +44,23 @@ let currentPlayback = {
 /**
  * Create a new playlist item
  */
-export function createPlaylistItem(libraryId, libraryName, options = {}) {
+export function createPlaylistItem(id, name, options = {}) {
     const {
         loops = [{ speed: 1.0, volume: 80, pitch: 0 }],
         gapBetweenLoops = 2000,
-        sleepMode = false
+        sleepMode = false,
+        isText = false
     } = options;
 
     return {
         id: `playlist-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        libraryId,
-        name: libraryName,
+        libraryId: isText ? null : id,
+        textId: isText ? id : null,
+        name,
         loops,
         gapBetweenLoops,
-        sleepMode
+        sleepMode,
+        isText
     };
 }
 
@@ -203,6 +208,18 @@ async function getLibraryContent(libraryId) {
 }
 
 /**
+ * Get content from a single text formatted for playback
+ */
+async function getTextContent(textId) {
+    const text = await getText(textId);
+    if (!text) return [];
+
+    // Split text into sentences or chunks
+    // For now, just return the whole text as one item
+    return [text.content];
+}
+
+/**
  * Run a single loop with specified speed and audio processing
  */
 async function runLoop(texts, loop, callbacks = {}) {
@@ -271,13 +288,18 @@ export async function runPlaylist(playlist, callbacks = {}) {
             currentPlayback.currentItemIndex = itemIndex;
             onItemStart?.(itemIndex, item);
 
-            console.log(`Starting Library ${itemIndex + 1}/${playlist.length}: ${item.name}`);
+            console.log(`Starting Item ${itemIndex + 1}/${playlist.length}: ${item.name}`);
 
-            // Load library content
-            const texts = await getLibraryContent(item.libraryId);
+            // Load content based on item type
+            let texts;
+            if (item.isText) {
+                texts = await getTextContent(item.textId);
+            } else {
+                texts = await getLibraryContent(item.libraryId);
+            }
 
             if (texts.length === 0) {
-                console.warn(`Library ${item.name} has no content, skipping`);
+                console.warn(`Item ${item.name} has no content, skipping`);
                 continue;
             }
 
